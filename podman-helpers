@@ -1,5 +1,5 @@
 ---
-- name: System Information Check
+- name: System Information and Directory Check
   hosts: all
   become: yes
   tasks:
@@ -35,6 +35,31 @@
       command: lsblk -f
       register: filesystem_type_output
 
+    - name: List files in /drd directory
+      command: ls -lrt /drd
+      register: drd_dir_output
+
+    - name: List files in /drd/ddm directory
+      command: ls -lrt /drd/ddm/
+      register: drd_ddm_dir_output
+
+    - name: List files in /drd/elt directory
+      command: ls -lrt /drd/elt/
+      register: drd_elt_dir_output
+
+    - name: List files in /home/ddm_drd/.config directory
+      command: ls -lrt /home/ddm_drd/.config/*
+      register: config_dir_output
+
+    - name: Search for "runroot =" in containers/storage.conf
+      command: grep "runroot =" /home/ddm_drd/config/containers/storage.conf
+      register: runroot_output
+
+    - name: Search for "graphroot =" in containers/storage.conf
+      command: grep "graphroot =" /home/ddm_drd/config/containers/storage.conf
+      register: graphroot_output
+
+    # Display results in readable format
     - name: Display current user output
       debug:
         msg: "{{ current_user_output.stdout }}"
@@ -66,3 +91,27 @@
     - name: Display filesystem type output
       debug:
         msg: "{{ filesystem_type_output.stdout }}"
+
+    - name: Display /drd directory listing
+      debug:
+        msg: "{{ drd_dir_output.stdout }}"
+
+    - name: Display /drd/ddm directory listing
+      debug:
+        msg: "{{ drd_ddm_dir_output.stdout }}"
+
+    - name: Display /drd/elt directory listing
+      debug:
+        msg: "{{ drd_elt_dir_output.stdout }}"
+
+    - name: Display /home/ddm_drd/.config directory listing
+      debug:
+        msg: "{{ config_dir_output.stdout }}"
+
+    - name: Display 'runroot' search result
+      debug:
+        msg: "{{ runroot_output.stdout }}"
+
+    - name: Display 'graphroot' search result
+      debug:
+        msg: "{{ graphroot_output.stdout }}"
