@@ -1,0 +1,68 @@
+---
+- name: System Information Check
+  hosts: all
+  become: yes
+  tasks:
+    - name: Get current user
+      command: whoami
+      register: current_user_output
+
+    - name: List all users
+      command: cat /etc/passwd
+      register: all_users_output
+
+    - name: Check user groups for a specific user
+      command: groups {{ ansible_user_id }}
+      register: user_groups_output
+
+    - name: List all groups
+      command: cat /etc/group
+      register: all_groups_output
+
+    - name: Check disk usage by filesystem
+      command: df -h
+      register: disk_usage_output
+
+    - name: Check disk usage by /home directory
+      command: du -sh /home
+      register: home_dir_usage_output
+
+    - name: Check inode usage
+      command: df -i
+      register: inode_usage_output
+
+    - name: Check filesystem type
+      command: lsblk -f
+      register: filesystem_type_output
+
+    - name: Display current user output
+      debug:
+        msg: "{{ current_user_output.stdout }}"
+
+    - name: Display all users output
+      debug:
+        msg: "{{ all_users_output.stdout }}"
+
+    - name: Display user groups output
+      debug:
+        msg: "{{ user_groups_output.stdout }}"
+
+    - name: Display all groups output
+      debug:
+        msg: "{{ all_groups_output.stdout }}"
+
+    - name: Display disk usage output
+      debug:
+        msg: "{{ disk_usage_output.stdout }}"
+
+    - name: Display /home directory usage output
+      debug:
+        msg: "{{ home_dir_usage_output.stdout }}"
+
+    - name: Display inode usage output
+      debug:
+        msg: "{{ inode_usage_output.stdout }}"
+
+    - name: Display filesystem type output
+      debug:
+        msg: "{{ filesystem_type_output.stdout }}"
