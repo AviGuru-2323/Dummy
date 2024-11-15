@@ -1,0 +1,40 @@
+---
+- name: Commit, run, and check logs of Podman container
+  hosts: target_host
+  become: true
+  tasks:
+    - name: Commit the broken Podman container
+      ansible.builtin.command:
+        cmd: "podman commit yqm_api yqm_api_backup"
+      register: commit_result
+      ignore_errors: true
+
+    - name: Check if commit was successful
+      ansible.builtin.debug:
+        msg: "Commit failed for container yqm_api"
+      when: commit_result.rc != 0
+      failed_when: commit_result.rc != 0
+
+    - name: Run a new container from committed image with /bin/bash
+      ansible.builtin.command:
+        cmd: "podman run -d --name yqm_api_new yqm_api_backup /bin/bash"
+      register: new_container
+      when: commit_result.rc == 0
+
+    - name: Check if new container is running
+      ansible.builtin.command:
+        cmd: "podman ps -q --filter name=yqm_api_new"
+      register: container_check
+      until: container_check.stdout != ""
+      retries: 5
+      delay: 2
+
+    - name: Go inside the container and cat services.log
+      ansible.builtin.command:
+        cmd: "podman exec yqm_api_new cat /home/logs/app/services.log"
+      register: log_output
+      when: container_check.stdout != ""
+    
+    - name: Show the log output
+      ansible.builtin.debug:
+        var: log_output.stdout
