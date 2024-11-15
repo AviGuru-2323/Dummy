@@ -1,5 +1,5 @@
 ---
-- name: Manage Podman Container
+- name: Manage Podman Container with Inline Entrypoint
   hosts: localhost
   become: yes
   tasks:
@@ -40,19 +40,27 @@
       debug:
         var: commit_output.stdout
 
-    # Step 3: Run the new container with /bin/bash
-    - name: Run new container with /bin/bash
+    # Step 3: Run the container with an inline entrypoint
+    - name: Run the container with an inline entrypoint
       command: >
-        podman run --name yqm_api_new -it yqm_api_image:v1 /bin/bash
-      async: 0
-      poll: 0
+        podman run --name yqm_api_new -d 
+        --entrypoint "/bin/bash -c 'while true; do echo \"Container is running\" >> /home/logs/app/services.log; sleep 10; done'" 
+        yqm_api_image:v1
       register: run_output
 
-    # Step 4: Access the container and view logs
+    - name: Show container run output
+      debug:
+        var: run_output.stdout
+
+    # Step 4: Check logs
+    - name: Wait for log file to generate
+      wait_for:
+        path: /home/logs/app/services.log
+        timeout: 30
+
     - name: Access container logs
       shell: podman exec yqm_api_new cat /home/logs/app/services.log
       register: log_output
-      failed_when: "'No such file or directory' in log_output.stderr"
 
     - name: Show container logs
       debug:
@@ -67,11 +75,11 @@
       debug:
         var: ps_output.stdout
 
-    # Step 6: Remove newly created container and image
+    # Step 6: Cleanup
     - name: Stop and remove the new container
       command: podman rm -f yqm_api_new
       ignore_errors: yes
 
     - name: Remove the new image
-      command: podman rmi yqm_api_image:v1
+      command: podman rmi -f yqm_api_image:v1
       ignore_errors: yes
