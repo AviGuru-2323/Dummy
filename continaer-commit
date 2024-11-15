@@ -1,40 +1,77 @@
 ---
-- name: Commit, run, and check logs of Podman container
-  hosts: target_host
-  become: true
+- name: Manage Podman Container
+  hosts: localhost
+  become: yes
   tasks:
-    - name: Commit the broken Podman container
-      ansible.builtin.command:
-        cmd: "podman commit yqm_api yqm_api_backup"
-      register: commit_result
-      ignore_errors: true
 
-    - name: Check if commit was successful
-      ansible.builtin.debug:
-        msg: "Commit failed for container yqm_api"
-      when: commit_result.rc != 0
-      failed_when: commit_result.rc != 0
+    # Step 1: Check for existing image and container
+    - name: Check if image exists
+      command: podman images -q yqm_api_image
+      register: image_check
+      failed_when: false
 
-    - name: Run a new container from committed image with /bin/bash
-      ansible.builtin.command:
-        cmd: "podman run -d --name yqm_api_new yqm_api_backup /bin/bash"
-      register: new_container
-      when: commit_result.rc == 0
-
-    - name: Check if new container is running
-      ansible.builtin.command:
-        cmd: "podman ps -q --filter name=yqm_api_new"
+    - name: Check if container is running
+      command: podman ps -aq -f "name=yqm_api_new"
       register: container_check
-      until: container_check.stdout != ""
-      retries: 5
-      delay: 2
+      failed_when: false
 
-    - name: Go inside the container and cat services.log
-      ansible.builtin.command:
-        cmd: "podman exec yqm_api_new cat /home/logs/app/services.log"
-      register: log_output
+    - name: Stop and remove running container if exists
       when: container_check.stdout != ""
-    
-    - name: Show the log output
-      ansible.builtin.debug:
+      block:
+        - name: Stop the container
+          command: podman stop yqm_api_new
+          ignore_errors: yes
+
+        - name: Remove the container
+          command: podman rm -f yqm_api_new
+          ignore_errors: yes
+
+    - name: Remove existing image if exists
+      when: image_check.stdout != ""
+      command: podman rmi -f yqm_api_image
+      ignore_errors: yes
+
+    # Step 2: Commit the broken container
+    - name: Commit broken container to new image
+      command: podman commit yqm_api yqm_api_image:v1
+      register: commit_output
+
+    - name: Show commit output
+      debug:
+        var: commit_output.stdout
+
+    # Step 3: Run the new container with /bin/bash
+    - name: Run new container with /bin/bash
+      command: >
+        podman run --name yqm_api_new -it yqm_api_image:v1 /bin/bash
+      async: 0
+      poll: 0
+      register: run_output
+
+    # Step 4: Access the container and view logs
+    - name: Access container logs
+      shell: podman exec yqm_api_new cat /home/logs/app/services.log
+      register: log_output
+      failed_when: "'No such file or directory' in log_output.stderr"
+
+    - name: Show container logs
+      debug:
         var: log_output.stdout
+
+    # Step 5: Check all Podman containers
+    - name: Check all Podman containers
+      command: podman ps -a
+      register: ps_output
+
+    - name: Display all Podman containers
+      debug:
+        var: ps_output.stdout
+
+    # Step 6: Remove newly created container and image
+    - name: Stop and remove the new container
+      command: podman rm -f yqm_api_new
+      ignore_errors: yes
+
+    - name: Remove the new image
+      command: podman rmi yqm_api_image:v1
+      ignore_errors: yes
