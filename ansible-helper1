@@ -1,0 +1,20 @@
+- name: Copy files to subfolders
+  hosts: localhost
+  tasks:
+    - name: Define source and target directories
+      set_fact:
+        source_dir: "/prod/dam/conf"
+        target_dirs:
+          - "/prod/dam/conf/app1"
+          - "/prod/dam/conf/app2"
+
+    - name: Ensure target directories exist
+      ansible.builtin.file:
+        path: "{{ item }}"
+        state: directory
+      loop: "{{ target_dirs }}"
+
+    - name: Copy only files from source to each target directory
+      ansible.builtin.command:
+        cmd: bash -c 'find "{{ source_dir }}" -maxdepth 1 -type f -exec cp {} "{{ item }}" \;'
+      loop: "{{ target_dirs }}"
