@@ -18,3 +18,10 @@
       ansible.builtin.command:
         cmd: bash -c 'find "{{ source_dir }}" -maxdepth 1 -type f -exec cp {} "{{ item }}" \;'
       loop: "{{ target_dirs }}"
+
+- name: Replace #{{container_name}} in the file with the specified variable
+  ansible.builtin.replace:
+    path: "{{ conf_base_dir }}/{{ instance_prop_file }}"
+    regexp: "#{{container_name}}"  # Matches the placeholder
+    replace: "{{ item.env_details.container_name }}"  # Replaces with this value
+  with_items: "{{ env_details_list }}"  # Assuming you are looping over a list of environment details
