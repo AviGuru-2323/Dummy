@@ -25,3 +25,16 @@
     regexp: "#{{container_name}}"  # Matches the placeholder
     replace: "{{ item.env_details.container_name }}"  # Replaces with this value
   with_items: "{{ env_details_list }}"  # Assuming you are looping over a list of environment details
+
+
+- name: Check if a folder exists and list its contents
+  hosts: localhost
+  tasks:
+    - name: Check if the folder exists
+      stat:
+        path: /path/to/folder
+      register: folder_info
+
+    - name: List folder contents if it exists
+      command: ls -l /path/to/folder
+      when: folder_info.stat.exists
