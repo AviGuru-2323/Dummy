@@ -59,3 +59,26 @@
       when:
         - folder_info.stat.exists
         - symlink_info.stat.islnk
+
+
+- name: Copy the actual file pointed to by a symlink
+  hosts: localhost
+  tasks:
+    - name: Get the target of the symlink
+      stat:
+        path: /path/to/symlink
+        follow: false
+      register: symlink_info
+
+    - name: Resolve relative path to absolute
+      set_fact:
+        resolved_path: "{{ symlink_info.stat.lnk_source | dirname }}/{{ symlink_info.stat.lnk_target }}"
+      
+    - name: Copy the actual file (target of the symlink)
+      copy:
+        src: "{{ resolved_path | realpath }}"
+        dest: /path/to/destination/file
+      when:
+        - symlink_info.stat.exists
+        - symlink_info.stat.islnk
+
