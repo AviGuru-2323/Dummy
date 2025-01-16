@@ -38,3 +38,17 @@
     - name: List folder contents if it exists
       command: ls -l /path/to/folder
       when: folder_info.stat.exists
+
+- name: Copy the actual file pointed to by a symlink
+  hosts: localhost
+  tasks:
+    - name: Get the target of the symlink
+      stat:
+        path: /path/to/symlink
+      register: symlink_info
+
+    - name: Copy the actual file (target of the symlink)
+      copy:
+        src: "{{ symlink_info.stat.resolved }}"
+        dest: /path/to/destination/file
+      when: symlink_info.stat.islnk
