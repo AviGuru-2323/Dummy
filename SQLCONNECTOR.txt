@@ -1,0 +1,206 @@
+plugins {
+    id 'org.springframework.boot' version '3.0.0'
+    id 'io.spring.dependency-management' version '1.0.15.RELEASE'
+    id 'java'
+}
+
+group = 'com.example'
+version = '0.0.1-SNAPSHOT'
+sourceCompatibility = '17'
+
+repositories {
+    mavenCentral()
+}
+
+dependencies {
+    // Spring Boot Dependencies
+    implementation 'org.springframework.boot:spring-boot-starter-web'
+    implementation 'org.springframework.boot:spring-boot-starter-thymeleaf'
+    implementation 'org.springframework.boot:spring-boot-starter-data-jpa'
+
+    // PostgreSQL Database
+    implementation 'org.postgresql:postgresql:42.5.0'
+
+    // JPA and Hibernate
+    implementation 'org.springframework.boot:spring-boot-starter-data-jpa'
+
+    // Optional: For better logging
+    implementation 'org.springframework.boot:spring-boot-starter-logging'
+
+    // Testing Dependencies
+    testImplementation 'org.springframework.boot:spring-boot-starter-test'
+    testImplementation 'org.junit.jupiter:junit-jupiter-api:5.8.2'
+    testImplementation 'org.junit.jupiter:junit-jupiter-engine:5.8.2'
+    testImplementation 'org.mockito:mockito-core:4.0.0'
+}
+
+test {
+    useJUnitPlatform()
+}
+
+tasks.withType(JavaCompile) {
+    options.encoding = 'UTF-8'
+}
+
+bootRun {
+    jvmArgs = ["-Dspring.profiles.active=dev"]
+}
+
+
+
+
+
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head>
+    <title>Database Query Interface</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/bootstrap/4.5.2/css/bootstrap.min.css"/>
+</head>
+<body>
+    <div class="container">
+        <h1>PostgreSQL Query Interface</h1>
+
+        <!-- Query Input Form -->
+        <form th:action="@{/execute-query}" method="post">
+            <textarea name="query" rows="5" class="form-control" placeholder="Enter SQL Query (SELECT, INSERT, UPDATE, DELETE)"></textarea><br>
+            <button type="submit" class="btn btn-primary">Execute</button>
+        </form>
+
+        <hr>
+
+        <!-- Display Query Results -->
+        <div th:if="${queryResult}">
+            <table class="table table-bordered">
+                <thead>
+                    <tr>
+                        <!-- Dynamically create table headers -->
+                        <th th:each="column : ${#maps.keys(queryResult[0])}" th:text="${column}"></th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <!-- Dynamically create table rows -->
+                    <tr th:each="row : ${queryResult}">
+                        <td th:each="column, iterStat : ${#maps.keys(row)}" th:text="${row[column]}"></td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+
+        <!-- Display Affected Rows for UPDATE/INSERT/DELETE -->
+        <div th:if="${affectedRows}">
+            <p th:text="'Rows affected: ' + ${affectedRows}"></p>
+        </div>
+
+        <!-- Display Error -->
+        <div th:if="${error}">
+            <p class="text-danger" th:text="${error}"></p>
+        </div>
+    </div>
+</body>
+</html>
+
+
+
+
+package com.example.demo.controller;
+
+import com.example.demo.service.DatabaseService;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.stereotype.Controller;
+import org.springframework.ui.Model;
+import org.springframework.web.bind.annotation.*;
+
+import java.util.List;
+import java.util.Map;
+
+@Controller
+public class DatabaseController {
+
+    @Autowired
+    private DatabaseService databaseService;
+
+    // Display the home page
+    @GetMapping("/")
+    public String homePage(Model model) {
+        return "index"; // This will render the input form for the query
+    }
+
+    // Execute SQL queries
+    @PostMapping("/execute-query")
+    public String executeQuery(@RequestParam("query") String query, Model model) {
+        try {
+            if (query.toLowerCase().startsWith("select")) {
+                List<Map<String, Object>> queryResult = databaseService.executeSelectQuery(query);
+                model.addAttribute("queryResult", queryResult);
+            } else {
+                int affectedRows = databaseService.executeUpdateQuery(query);
+                model.addAttribute("affectedRows", affectedRows);
+            }
+        } catch (Exception e) {
+            model.addAttribute("error", "Error executing query: " + e.getMessage());
+        }
+        return "index"; // Returns the view with results
+    }
+}
+
+
+
+package com.example.demo.service;
+
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+import javax.persistence.EntityManager;
+import javax.persistence.Query;
+import java.util.List;
+import java.util.Map;
+
+@Service
+public class DatabaseService {
+
+    @Autowired
+    private EntityManager entityManager;
+
+    // Execute SELECT query and return result as list of rows with column names
+    public List<Map<String, Object>> executeSelectQuery(String query) {
+        Query nativeQuery = entityManager.createNativeQuery(query);
+        List<Object[]> resultList = nativeQuery.getResultList();
+        List<Map<String, Object>> result = new java.util.ArrayList<>();
+
+        if (resultList.size() > 0) {
+            // Retrieve column names dynamically from the query result metadata
+            int columnCount = resultList.get(0).length;
+            String[] columnNames = nativeQuery.getResultList().get(0).getClass().getDeclaredFields();
+
+            // Process each row and add to result list
+            for (Object[] row : resultList) {
+                java.util.Map<String, Object> rowMap = new java.util.HashMap<>();
+                for (int i = 0; i < columnCount; i++) {
+                    rowMap.put(columnNames[i], row[i]);
+                }
+                result.add(rowMap);
+            }
+        }
+        return result;
+    }
+
+    // Execute INSERT, UPDATE, DELETE query
+    @Transactional
+    public int executeUpdateQuery(String query) {
+        Query nativeQuery = entityManager.createNativeQuery(query);
+        return nativeQuery.executeUpdate();
+    }
+}
+
+
+
+spring.datasource.url=jdbc:postgresql://localhost:5432/your_database
+spring.datasource.username=your_username
+spring.datasource.password=your_password
+spring.jpa.hibernate.ddl-auto=update
+spring.jpa.properties.hibernate.jdbc.lob.non_contextual_creation=true
+spring.jpa.show-sql=true
+spring.thymeleaf.prefix=classpath:/templates/
+spring.thymeleaf.suffix=.html
+
+
