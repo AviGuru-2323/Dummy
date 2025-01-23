@@ -3,6 +3,7 @@
 <head>
     <title>Database Query Interface</title>
     <style>
+        /* Styling for the page */
         .text-warning {
             color: #ffc107;
             font-weight: bold;
@@ -57,17 +58,21 @@
         table {
             width: 100%;
             border-collapse: collapse;
+            table-layout: auto;
         }
         th, td {
             border: 1px solid #ccc;
             text-align: center;
             padding: 10px;
+            white-space: normal;
             word-wrap: break-word;
-            word-break: break-word;
         }
         th {
             background-color: #f4f4f4;
             font-weight: bold;
+            position: sticky;
+            top: 0;
+            z-index: 2;
         }
         tr:nth-child(odd) {
             background-color: #f9f9f9;
@@ -75,39 +80,92 @@
         tr:nth-child(even) {
             background-color: #ffffff;
         }
-        #loader {
+        /* Loader Modal Styles */
+        .modal-overlay {
             display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.5);
+            z-index: 1000;
+            justify-content: center;
+            align-items: center;
+        }
+        .modal-content {
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
             text-align: center;
+            width: 300px;
+        }
+        .progress-bar {
+            width: 100%;
+            background-color: #f3f3f3;
+            border-radius: 20px;
+            overflow: hidden;
             margin: 20px 0;
+        }
+        .progress-bar-fill {
+            height: 20px;
+            width: 0;
+            background-color: #007bff;
+            border-radius: 20px;
+            transition: width 0.3s ease;
         }
     </style>
     <script>
+        // Function to get the selected text in the textarea
         function getSelectedText() {
             var textarea = document.querySelector('textarea');
             return textarea.value.substring(textarea.selectionStart, textarea.selectionEnd);
         }
 
+        // Function to show the loader
+        function showLoader() {
+            const modal = document.getElementById('loaderModal');
+            modal.style.display = 'flex';
+            const progressFill = document.getElementById('progressFill');
+            progressFill.style.width = '0%';
+            let progress = 0;
+            const interval = setInterval(() => {
+                progress += 10;
+                progressFill.style.width = `${progress}%`;
+                if (progress >= 100) {
+                    clearInterval(interval);
+                }
+            }, 300);
+        }
+
+        // Function to hide the loader
+        function hideLoader() {
+            const modal = document.getElementById('loaderModal');
+            modal.style.display = 'none';
+        }
+
+        // Function to execute the highlighted query
         function executeHighlightedQuery(event) {
             event.preventDefault();
-            var highlightedQuery = getSelectedText().trim();
+            const highlightedQuery = getSelectedText().trim();
 
             if (!highlightedQuery) {
                 alert("Please highlight a query to execute.");
                 return;
             }
 
-            if ((/delete\s|update\s/i.test(highlightedQuery)) && !/where\s/i.test(highlightedQuery)) {
-                alert("DELETE or UPDATE queries must include a WHERE clause to avoid unsafe operations.");
+            // Validate DELETE/UPDATE without WHERE
+            const normalizedQuery = highlightedQuery.replace(/\s+/g, '');
+            if ((/delete\s|update\s/i.test(highlightedQuery)) && 
+                (!/where/i.test(highlightedQuery) || normalizedQuery.includes('where1=1'))) {
+                alert("DELETE or UPDATE queries must include a valid WHERE clause. A WHERE clause with 1=1 is not allowed.");
                 return;
             }
 
-            // Show loader
-            document.getElementById('loader').style.display = 'block';
+            showLoader(); // Show loader before executing query
 
-            // Hide results section while loading
-            document.getElementById('queryResults').innerHTML = '';
-
-            var formData = new FormData();
+            const formData = new FormData();
             formData.append('query', highlightedQuery);
 
             fetch('/execute-query', {
@@ -116,14 +174,11 @@
             })
             .then(response => response.text())
             .then(data => {
-                // Hide loader
-                document.getElementById('loader').style.display = 'none';
-                // Update results section
+                hideLoader(); // Hide loader after getting results
                 document.getElementById('queryResults').innerHTML = data;
             })
             .catch(error => {
-                // Hide loader
-                document.getElementById('loader').style.display = 'none';
+                hideLoader();
                 alert("Error executing query.");
             });
         }
@@ -139,11 +194,6 @@
             <button type="submit">Execute Selected Query</button>
         </form>
 
-        <!-- Loader -->
-        <div id="loader">
-            <p>Loading, please wait...</p>
-        </div>
-
         <hr>
 
         <!-- Display Query Results -->
@@ -151,7 +201,6 @@
             <div th:if="${queryResult == null or #lists.isEmpty(queryResult)}">
                 <p class="text-warning">Zero results found for the query.</p>
             </div>
-
             <div th:if="${queryResult != null and not #lists.isEmpty(queryResult)}">
                 <h3 class="text-success">Query Results:</h3>
                 <div class="table-container">
@@ -169,28 +218,17 @@
                     </table>
                 </div>
             </div>
+        </div>
+    </div>
 
-            <div th:if="${affectedRows}">
-                <h3 class="text-info">Execution Summary:</h3>
-                <p th:text="'Rows affected: ' + ${affectedRows}"></p>
-            </div>
-
-            <div th:if="${error}" class="text-danger">
-                <h3>Error:</h3>
-                <p th:text="${error}"></p>
+    <!-- Loader Modal -->
+    <div id="loaderModal" class="modal-overlay">
+        <div class="modal-content">
+            <p>Processing your query...</p>
+            <div class="progress-bar">
+                <div id="progressFill" class="progress-bar-fill"></div>
             </div>
         </div>
     </div>
 </body>
 </html>
-
-
-  // Remove all spaces from the query for validation
-        var normalizedQuery = highlightedQuery.replace(/\s+/g, '');
-
-        // Validate DELETE or UPDATE without a proper WHERE clause or with `1=1`
-        if ((/delete\s|update\s/i.test(highlightedQuery)) && 
-            (!/where/i.test(highlightedQuery) || normalizedQuery.includes('where1=1'))) {
-            alert("DELETE or UPDATE queries must include a valid WHERE clause. A WHERE clause with 1=1 is not allowed.");
-            return;
-        }
