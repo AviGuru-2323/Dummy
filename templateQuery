@@ -41,16 +41,16 @@
         table {
             width: 100%;
             border-collapse: collapse;
-            table-layout: fixed; /* Enforce fixed column widths */
+            table-layout: auto; /* Allow flexible column width */
         }
         th, td {
             border: 1px solid #ccc;
             text-align: center;
             padding: 10px;
-            height: 50px; /* Fixed row height */
-            overflow: hidden; /* Prevent text overflow */
-            white-space: nowrap; /* Prevent wrapping */
-            text-overflow: ellipsis; /* Add ellipsis for overflow text */
+            height: auto; /* Adjust row height as needed */
+            white-space: normal; /* Allow text to wrap */
+            word-wrap: break-word; /* Break long words in cells */
+            word-break: break-word; /* Handle very long words in cells */
         }
         th {
             background-color: #f4f4f4;
@@ -58,6 +58,7 @@
             position: sticky; /* Freeze column headers */
             top: 0;
             z-index: 2; /* Ensure headers stay above table rows */
+            text-align: center;
         }
         tr:nth-child(odd) {
             background-color: #f9f9f9;
@@ -87,13 +88,13 @@
                     <thead>
                         <tr>
                             <!-- Dynamically create table headers -->
-                            <th th:each="column : ${queryResult[0].keySet()}" th:text="${column}" style="width: 150px;"></th>
+                            <th th:each="column : ${queryResult[0].keySet()}" th:text="${column}" style="min-width: 150px;"></th>
                         </tr>
                     </thead>
                     <tbody>
                         <!-- Dynamically create table rows -->
                         <tr th:each="row : ${queryResult}">
-                            <td th:each="column : ${row.values()}" th:text="${column}" style="width: 150px;"></td>
+                            <td th:each="column : ${row.values()}" th:text="${column}" style="min-width: 150px;"></td>
                         </tr>
                     </tbody>
                 </table>
