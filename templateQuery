@@ -183,3 +183,14 @@
     </div>
 </body>
 </html>
+
+
+  // Remove all spaces from the query for validation
+        var normalizedQuery = highlightedQuery.replace(/\s+/g, '');
+
+        // Validate DELETE or UPDATE without a proper WHERE clause or with `1=1`
+        if ((/delete\s|update\s/i.test(highlightedQuery)) && 
+            (!/where/i.test(highlightedQuery) || normalizedQuery.includes('where1=1'))) {
+            alert("DELETE or UPDATE queries must include a valid WHERE clause. A WHERE clause with 1=1 is not allowed.");
+            return;
+        }
