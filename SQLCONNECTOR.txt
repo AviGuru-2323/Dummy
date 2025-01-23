@@ -209,23 +209,90 @@ spring.thymeleaf.suffix=.html
 <html xmlns:th="http://www.thymeleaf.org">
 <head>
     <title>Database Query Interface</title>
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/bootstrap/4.5.2/css/bootstrap.min.css"/>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 20px;
+        }
+        h1 {
+            text-align: center;
+            color: #007bff;
+        }
+        textarea {
+            width: 100%;
+            font-size: 16px;
+            font-family: monospace;
+            border: 1px solid #ccc;
+            padding: 10px;
+            border-radius: 4px;
+            box-sizing: border-box;
+        }
+        button {
+            width: 100%;
+            background-color: #007bff;
+            color: white;
+            border: none;
+            padding: 10px 15px;
+            font-size: 18px;
+            cursor: pointer;
+            border-radius: 4px;
+        }
+        button:hover {
+            background-color: #0056b3;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 20px;
+        }
+        th, td {
+            border: 1px solid #ccc;
+            padding: 10px;
+            text-align: center;
+        }
+        th {
+            background-color: #f4f4f4;
+            font-weight: bold;
+        }
+        tr:nth-child(odd) {
+            background-color: #f9f9f9;
+        }
+        tr:nth-child(even) {
+            background-color: #ffffff;
+        }
+        .query-output {
+            margin-top: 20px;
+        }
+        .text-danger {
+            color: red;
+            font-weight: bold;
+        }
+        .text-success {
+            color: green;
+            font-weight: bold;
+        }
+        .text-info {
+            color: blue;
+            font-weight: bold;
+        }
+    </style>
 </head>
 <body>
-    <div class="container">
+    <div>
         <h1>PostgreSQL Query Interface</h1>
 
         <!-- Query Input Form -->
         <form th:action="@{/execute-query}" method="post">
-            <textarea name="query" rows="5" class="form-control" placeholder="Enter SQL Query (SELECT, INSERT, UPDATE, DELETE)"></textarea><br>
-            <button type="submit" class="btn btn-primary">Execute</button>
+            <textarea name="query" rows="5" placeholder="Enter SQL Query (SELECT, INSERT, UPDATE, DELETE)" required></textarea><br><br>
+            <button type="submit">Execute Query</button>
         </form>
 
         <hr>
 
         <!-- Display Query Results -->
-        <div th:if="${queryResult}">
-            <table class="table table-bordered">
+        <div th:if="${queryResult}" class="query-output">
+            <h3 class="text-success">Query Results:</h3>
+            <table>
                 <thead>
                     <tr>
                         <!-- Dynamically create table headers -->
@@ -242,16 +309,19 @@ spring.thymeleaf.suffix=.html
         </div>
 
         <!-- Display Affected Rows for UPDATE/INSERT/DELETE -->
-        <div th:if="${affectedRows}">
+        <div th:if="${affectedRows}" class="query-output">
+            <h3 class="text-info">Execution Summary:</h3>
             <p th:text="'Rows affected: ' + ${affectedRows}"></p>
         </div>
 
         <!-- Display Error -->
-        <div th:if="${error}">
-            <p class="text-danger" th:text="${error}"></p>
+        <div th:if="${error}" class="text-danger">
+            <h3>Error:</h3>
+            <p th:text="${error}"></p>
         </div>
     </div>
 </body>
 </html>
+
 
        
