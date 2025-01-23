@@ -107,18 +107,25 @@
     <div>
         <h1>PostgreSQL Query Interface</h1>
 
-        <!-- Query Input Form -->
-        <form onsubmit="executeHighlightedQuery(event)">
-            <textarea name="query" rows="5" placeholder="Enter SQL Query (SELECT, INSERT, UPDATE, DELETE)" required></textarea><br><br>
-            <button type="submit">Execute Selected Query</button>
-        </form>
+        <!-- Query Input Form (only shown if there are no query results) -->
+        <div th:if="${not queryResult}">
+            <form onsubmit="executeHighlightedQuery(event)">
+                <textarea name="query" rows="5" placeholder="Enter SQL Query (SELECT, INSERT, UPDATE, DELETE)" required></textarea><br><br>
+                <button type="submit">Execute Selected Query</button>
+            </form>
+        </div>
 
         <hr>
 
         <!-- Display Query Results -->
         <div id="queryResults">
-            <!-- Query results will be inserted here dynamically via AJAX -->
-            <div th:if="${queryResult}">
+            <!-- Display a message if no query results -->
+            <div th:if="${#lists.isEmpty(queryResult)}">
+                <p class="text-warning">Zero results found for the query.</p>
+            </div>
+
+            <!-- Display actual query results if available -->
+            <div th:if="${not #lists.isEmpty(queryResult)}">
                 <h3 class="text-success">Query Results:</h3>
                 <div class="table-container">
                     <table>
