@@ -3,6 +3,24 @@
 <head>
     <title>Database Query Interface</title>
     <style>
+
+    .text-warning {
+        color: #ffc107; /* Yellow */
+        font-weight: bold;
+    }
+    .text-success {
+        color: #28a745; /* Green */
+        font-weight: bold;
+    }
+    .text-danger {
+        color: #dc3545; /* Red */
+        font-weight: bold;
+    }
+    .text-info {
+        color: #17a2b8; /* Teal/Blue */
+        font-weight: bold;
+    }
+
         body {
             font-family: Arial, sans-serif;
             margin: 20px;
