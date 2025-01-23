@@ -1,0 +1,116 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head>
+    <title>Database Query Interface</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 20px;
+        }
+        h1 {
+            text-align: center;
+            color: #007bff;
+        }
+        textarea {
+            width: 100%;
+            font-size: 16px;
+            font-family: monospace;
+            border: 1px solid #ccc;
+            padding: 10px;
+            border-radius: 4px;
+            box-sizing: border-box;
+        }
+        button {
+            width: 100%;
+            background-color: #007bff;
+            color: white;
+            border: none;
+            padding: 10px 15px;
+            font-size: 18px;
+            cursor: pointer;
+            border-radius: 4px;
+        }
+        button:hover {
+            background-color: #0056b3;
+        }
+        .table-container {
+            overflow: auto;
+            max-height: 400px; /* Adjust height as needed */
+            border: 1px solid #ccc;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            table-layout: fixed; /* Enforce fixed column widths */
+        }
+        th, td {
+            border: 1px solid #ccc;
+            text-align: center;
+            padding: 10px;
+            height: 50px; /* Fixed row height */
+            overflow: hidden; /* Prevent text overflow */
+            white-space: nowrap; /* Prevent wrapping */
+            text-overflow: ellipsis; /* Add ellipsis for overflow text */
+        }
+        th {
+            background-color: #f4f4f4;
+            font-weight: bold;
+            position: sticky; /* Freeze column headers */
+            top: 0;
+            z-index: 2; /* Ensure headers stay above table rows */
+        }
+        tr:nth-child(odd) {
+            background-color: #f9f9f9;
+        }
+        tr:nth-child(even) {
+            background-color: #ffffff;
+        }
+    </style>
+</head>
+<body>
+    <div>
+        <h1>PostgreSQL Query Interface</h1>
+
+        <!-- Query Input Form -->
+        <form th:action="@{/execute-query}" method="post">
+            <textarea name="query" rows="5" placeholder="Enter SQL Query (SELECT, INSERT, UPDATE, DELETE)" required></textarea><br><br>
+            <button type="submit">Execute Query</button>
+        </form>
+
+        <hr>
+
+        <!-- Display Query Results -->
+        <div th:if="${queryResult}" class="query-output">
+            <h3 class="text-success">Query Results:</h3>
+            <div class="table-container">
+                <table>
+                    <thead>
+                        <tr>
+                            <!-- Dynamically create table headers -->
+                            <th th:each="column : ${queryResult[0].keySet()}" th:text="${column}" style="width: 150px;"></th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <!-- Dynamically create table rows -->
+                        <tr th:each="row : ${queryResult}">
+                            <td th:each="column : ${row.values()}" th:text="${column}" style="width: 150px;"></td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <!-- Display Affected Rows for UPDATE/INSERT/DELETE -->
+        <div th:if="${affectedRows}" class="query-output">
+            <h3 class="text-info">Execution Summary:</h3>
+            <p th:text="'Rows affected: ' + ${affectedRows}"></p>
+        </div>
+
+        <!-- Display Error -->
+        <div th:if="${error}" class="text-danger">
+            <h3>Error:</h3>
+            <p th:text="${error}"></p>
+        </div>
+    </div>
+</body>
+</html>
