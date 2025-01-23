@@ -238,4 +238,20 @@ spring.thymeleaf.suffix=.html
                         <td th:each="column : ${row.values()}" th:text="${column}"></td>
                     </tr>
                 </tbody>
+            </table>
+        </div>
+
+        <!-- Display Affected Rows for UPDATE/INSERT/DELETE -->
+        <div th:if="${affectedRows}">
+            <p th:text="'Rows affected: ' + ${affectedRows}"></p>
+        </div>
+
+        <!-- Display Error -->
+        <div th:if="${error}">
+            <p class="text-danger" th:text="${error}"></p>
+        </div>
+    </div>
+</body>
+</html>
+
        
