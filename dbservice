@@ -1,0 +1,40 @@
+import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.jdbc.core.RowMapper;
+import org.springframework.stereotype.Service;
+import org.springframework.beans.factory.annotation.Autowired;
+import java.sql.ResultSet;
+import java.sql.SQLException;
+import java.util.List;
+import java.util.Map;
+import org.springframework.jdbc.core.BeanPropertyRowMapper;
+
+@Service
+public class DatabaseService {
+
+    @Autowired
+    private JdbcTemplate jdbcTemplate;
+
+    // RowMapper to map database result to a Map<String, Object>
+    public List<Map<String, Object>> fetchDataFromDatabase(String sql) {
+        return jdbcTemplate.query(sql, new RowMapper<Map<String, Object>>() {
+            @Override
+            public Map<String, Object> mapRow(ResultSet rs, int rowNum) throws SQLException {
+                Map<String, Object> row = new LinkedHashMap<>();
+                
+                // Retrieve all columns dynamically and put into Map
+                int columnCount = rs.getMetaData().getColumnCount();
+                for (int i = 1; i <= columnCount; i++) {
+                    String columnName = rs.getMetaData().getColumnName(i);
+                    Object columnValue = rs.getObject(i);
+                    row.put(columnName, columnValue);
+                }
+                return row;
+            }
+        });
+    }
+
+    // Example method for INSERT/UPDATE/DELETE
+    public int executeUpdate(String sql) {
+        return jdbcTemplate.update(sql);
+    }
+}
