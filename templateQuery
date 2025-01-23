@@ -123,6 +123,12 @@
             return textarea.value.substring(textarea.selectionStart, textarea.selectionEnd);
         }
 
+        // Function to set the selection back to the textarea
+        function setSelection(start, end) {
+            var textarea = document.querySelector('textarea');
+            textarea.setSelectionRange(start, end);
+        }
+
         // Function to show the loader
         function showLoader() {
             const modal = document.getElementById('loaderModal');
@@ -148,6 +154,7 @@
         // Function to execute the highlighted query
         function executeHighlightedQuery(event) {
             event.preventDefault();
+            const textarea = document.querySelector('textarea');
             const highlightedQuery = getSelectedText().trim();
 
             if (!highlightedQuery) {
@@ -163,6 +170,9 @@
                 return;
             }
 
+            const selectionStart = textarea.selectionStart;
+            const selectionEnd = textarea.selectionEnd;
+
             showLoader(); // Show loader before executing query
 
             const formData = new FormData();
@@ -176,6 +186,9 @@
             .then(data => {
                 hideLoader(); // Hide loader after getting results
                 document.getElementById('queryResults').innerHTML = data;
+
+                // Restore the selection after query is executed
+                setSelection(selectionStart, selectionEnd);
             })
             .catch(error => {
                 hideLoader();
