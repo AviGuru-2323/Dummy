@@ -204,3 +204,38 @@ spring.thymeleaf.prefix=classpath:/templates/
 spring.thymeleaf.suffix=.html
 
 
+
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head>
+    <title>Database Query Interface</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/bootstrap/4.5.2/css/bootstrap.min.css"/>
+</head>
+<body>
+    <div class="container">
+        <h1>PostgreSQL Query Interface</h1>
+
+        <!-- Query Input Form -->
+        <form th:action="@{/execute-query}" method="post">
+            <textarea name="query" rows="5" class="form-control" placeholder="Enter SQL Query (SELECT, INSERT, UPDATE, DELETE)"></textarea><br>
+            <button type="submit" class="btn btn-primary">Execute</button>
+        </form>
+
+        <hr>
+
+        <!-- Display Query Results -->
+        <div th:if="${queryResult}">
+            <table class="table table-bordered">
+                <thead>
+                    <tr>
+                        <!-- Dynamically create table headers -->
+                        <th th:each="column : ${queryResult[0].keySet()}" th:text="${column}"></th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <!-- Dynamically create table rows -->
+                    <tr th:each="row : ${queryResult}">
+                        <td th:each="column : ${row.values()}" th:text="${column}"></td>
+                    </tr>
+                </tbody>
+       
