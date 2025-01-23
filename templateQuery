@@ -35,29 +35,29 @@
         }
         .table-container {
             overflow: auto;
-            max-height: 400px; /* Adjust height as needed */
+            max-height: 400px;
             border: 1px solid #ccc;
         }
         table {
             width: 100%;
             border-collapse: collapse;
-            table-layout: auto; /* Allow flexible column width */
+            table-layout: auto;
         }
         th, td {
             border: 1px solid #ccc;
             text-align: center;
             padding: 10px;
-            height: auto; /* Adjust row height as needed */
-            white-space: normal; /* Allow text to wrap */
-            word-wrap: break-word; /* Break long words in cells */
-            word-break: break-word; /* Handle very long words in cells */
+            height: auto;
+            white-space: normal;
+            word-wrap: break-word;
+            word-break: break-word;
         }
         th {
             background-color: #f4f4f4;
             font-weight: bold;
-            position: sticky; /* Freeze column headers */
+            position: sticky;
             top: 0;
-            z-index: 2; /* Ensure headers stay above table rows */
+            z-index: 2;
             text-align: center;
         }
         tr:nth-child(odd) {
@@ -67,50 +67,86 @@
             background-color: #ffffff;
         }
     </style>
+    <script>
+        // Function to get the selected text in the textarea
+        function getSelectedText() {
+            var textarea = document.querySelector('textarea');
+            return textarea.value.substring(textarea.selectionStart, textarea.selectionEnd);
+        }
+
+        // Function to send the highlighted query to the backend and update the results section
+        function executeHighlightedQuery(event) {
+            event.preventDefault();
+            var highlightedQuery = getSelectedText();
+            if (highlightedQuery.trim() === "") {
+                alert("Please highlight a query to execute.");
+                return;
+            }
+
+            // Create a new FormData object to send the query via POST
+            var formData = new FormData();
+            formData.append('query', highlightedQuery);
+
+            // Make a fetch request to the backend to execute the query
+            fetch('/execute-query', {
+                method: 'POST',
+                body: formData
+            })
+            .then(response => response.text())  // Expecting HTML response from the backend
+            .then(data => {
+                // Update the results section with the new content
+                document.getElementById('queryResults').innerHTML = data;
+            })
+            .catch(error => {
+                alert("Error executing query.");
+            });
+        }
+    </script>
 </head>
 <body>
     <div>
         <h1>PostgreSQL Query Interface</h1>
 
         <!-- Query Input Form -->
-        <form th:action="@{/execute-query}" method="post">
+        <form onsubmit="executeHighlightedQuery(event)">
             <textarea name="query" rows="5" placeholder="Enter SQL Query (SELECT, INSERT, UPDATE, DELETE)" required></textarea><br><br>
-            <button type="submit">Execute Query</button>
+            <button type="submit">Execute Selected Query</button>
         </form>
 
         <hr>
 
         <!-- Display Query Results -->
-        <div th:if="${queryResult}" class="query-output">
-            <h3 class="text-success">Query Results:</h3>
-            <div class="table-container">
-                <table>
-                    <thead>
-                        <tr>
-                            <!-- Dynamically create table headers -->
-                            <th th:each="column : ${queryResult[0].keySet()}" th:text="${column}" style="min-width: 150px;"></th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        <!-- Dynamically create table rows -->
-                        <tr th:each="row : ${queryResult}">
-                            <td th:each="column : ${row.values()}" th:text="${column}" style="min-width: 150px;"></td>
-                        </tr>
-                    </tbody>
-                </table>
+        <div id="queryResults">
+            <!-- Query results will be inserted here dynamically via AJAX -->
+            <div th:if="${queryResult}">
+                <h3 class="text-success">Query Results:</h3>
+                <div class="table-container">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th th:each="column : ${queryResult[0].keySet()}" th:text="${column}" style="min-width: 150px;"></th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr th:each="row : ${queryResult}">
+                                <td th:each="column : ${row.values()}" th:text="${column}" style="min-width: 150px;"></td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
             </div>
-        </div>
 
-        <!-- Display Affected Rows for UPDATE/INSERT/DELETE -->
-        <div th:if="${affectedRows}" class="query-output">
-            <h3 class="text-info">Execution Summary:</h3>
-            <p th:text="'Rows affected: ' + ${affectedRows}"></p>
-        </div>
+            <!-- Display Affected Rows for UPDATE/INSERT/DELETE -->
+            <div th:if="${affectedRows}">
+                <h3 class="text-info">Execution Summary:</h3>
+                <p th:text="'Rows affected: ' + ${affectedRows}"></p>
+            </div>
 
-        <!-- Display Error -->
-        <div th:if="${error}" class="text-danger">
-            <h3>Error:</h3>
-            <p th:text="${error}"></p>
+            <!-- Display Error -->
+            <div th:if="${error}" class="text-danger">
+                <h3>Error:</h3>
+                <p th:text="${error}"></p>
+            </div>
         </div>
     </div>
 </body>
