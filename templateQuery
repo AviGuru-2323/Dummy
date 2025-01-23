@@ -3,24 +3,22 @@
 <head>
     <title>Database Query Interface</title>
     <style>
-
-    .text-warning {
-        color: #ffc107; /* Yellow */
-        font-weight: bold;
-    }
-    .text-success {
-        color: #28a745; /* Green */
-        font-weight: bold;
-    }
-    .text-danger {
-        color: #dc3545; /* Red */
-        font-weight: bold;
-    }
-    .text-info {
-        color: #17a2b8; /* Teal/Blue */
-        font-weight: bold;
-    }
-
+        .text-warning {
+            color: #ffc107;
+            font-weight: bold;
+        }
+        .text-success {
+            color: #28a745;
+            font-weight: bold;
+        }
+        .text-danger {
+            color: #dc3545;
+            font-weight: bold;
+        }
+        .text-info {
+            color: #17a2b8;
+            font-weight: bold;
+        }
         body {
             font-family: Arial, sans-serif;
             margin: 20px;
@@ -59,24 +57,17 @@
         table {
             width: 100%;
             border-collapse: collapse;
-            table-layout: auto;
         }
         th, td {
             border: 1px solid #ccc;
             text-align: center;
             padding: 10px;
-            height: auto;
-            white-space: normal;
             word-wrap: break-word;
             word-break: break-word;
         }
         th {
             background-color: #f4f4f4;
             font-weight: bold;
-            position: sticky;
-            top: 0;
-            z-index: 2;
-            text-align: center;
         }
         tr:nth-child(odd) {
             background-color: #f9f9f9;
@@ -84,38 +75,55 @@
         tr:nth-child(even) {
             background-color: #ffffff;
         }
+        #loader {
+            display: none;
+            text-align: center;
+            margin: 20px 0;
+        }
     </style>
     <script>
-        // Function to get the selected text in the textarea
         function getSelectedText() {
             var textarea = document.querySelector('textarea');
             return textarea.value.substring(textarea.selectionStart, textarea.selectionEnd);
         }
 
-        // Function to send the highlighted query to the backend and update the results section
         function executeHighlightedQuery(event) {
             event.preventDefault();
-            var highlightedQuery = getSelectedText();
-            if (highlightedQuery.trim() === "") {
+            var highlightedQuery = getSelectedText().trim();
+
+            if (!highlightedQuery) {
                 alert("Please highlight a query to execute.");
                 return;
             }
 
-            // Create a new FormData object to send the query via POST
+            if ((/delete\s|update\s/i.test(highlightedQuery)) && !/where\s/i.test(highlightedQuery)) {
+                alert("DELETE or UPDATE queries must include a WHERE clause to avoid unsafe operations.");
+                return;
+            }
+
+            // Show loader
+            document.getElementById('loader').style.display = 'block';
+
+            // Hide results section while loading
+            document.getElementById('queryResults').innerHTML = '';
+
             var formData = new FormData();
             formData.append('query', highlightedQuery);
 
-            // Make a fetch request to the backend to execute the query
             fetch('/execute-query', {
                 method: 'POST',
                 body: formData
             })
-            .then(response => response.text())  // Expecting HTML response from the backend
+            .then(response => response.text())
             .then(data => {
-                // Update the results section with the new content
+                // Hide loader
+                document.getElementById('loader').style.display = 'none';
+                // Update results section
                 document.getElementById('queryResults').innerHTML = data;
             })
             .catch(error => {
+                // Hide loader
+                document.getElementById('loader').style.display = 'none';
                 alert("Error executing query.");
             });
         }
@@ -125,49 +133,48 @@
     <div>
         <h1>PostgreSQL Query Interface</h1>
 
-        <!-- Query Input Form (only shown if there are no query results) -->
-        <div th:if="${queryResult == null or #lists.isEmpty(queryResult)}">
-            <form onsubmit="executeHighlightedQuery(event)">
-                <textarea name="query" rows="5" placeholder="Enter SQL Query (SELECT, INSERT, UPDATE, DELETE)" required></textarea><br><br>
-                <button type="submit">Execute Selected Query</button>
-            </form>
+        <!-- Query Input Form -->
+        <form onsubmit="executeHighlightedQuery(event)">
+            <textarea name="query" rows="5" placeholder="Enter SQL Query (SELECT, INSERT, UPDATE, DELETE)" required></textarea><br><br>
+            <button type="submit">Execute Selected Query</button>
+        </form>
+
+        <!-- Loader -->
+        <div id="loader">
+            <p>Loading, please wait...</p>
         </div>
 
         <hr>
 
         <!-- Display Query Results -->
         <div id="queryResults">
-            <!-- Display a message if no query results -->
             <div th:if="${queryResult == null or #lists.isEmpty(queryResult)}">
                 <p class="text-warning">Zero results found for the query.</p>
             </div>
 
-            <!-- Display actual query results if available -->
             <div th:if="${queryResult != null and not #lists.isEmpty(queryResult)}">
                 <h3 class="text-success">Query Results:</h3>
                 <div class="table-container">
                     <table>
                         <thead>
                             <tr>
-                                <th th:each="column : ${queryResult[0].keySet()}" th:text="${column}" style="min-width: 150px;"></th>
+                                <th th:each="column : ${queryResult[0].keySet()}" th:text="${column}"></th>
                             </tr>
                         </thead>
                         <tbody>
                             <tr th:each="row : ${queryResult}">
-                                <td th:each="column : ${row.values()}" th:text="${column}" style="min-width: 150px;"></td>
+                                <td th:each="column : ${row.values()}" th:text="${column}"></td>
                             </tr>
                         </tbody>
                     </table>
                 </div>
             </div>
 
-            <!-- Display Affected Rows for UPDATE/INSERT/DELETE -->
             <div th:if="${affectedRows}">
                 <h3 class="text-info">Execution Summary:</h3>
                 <p th:text="'Rows affected: ' + ${affectedRows}"></p>
             </div>
 
-            <!-- Display Error -->
             <div th:if="${error}" class="text-danger">
                 <h3>Error:</h3>
                 <p th:text="${error}"></p>
