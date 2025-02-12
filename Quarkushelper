@@ -87,3 +87,7 @@ public class BankService {
         return bankServiceImpl.getInterestRate(); // Call the service method
     }
 }
+
+
+quarkus.smallrye-graphql.graphql.schema-export.enabled=true
+quarkus.smallrye-graphql.graphql.schema-export.path=/schema.graphql
