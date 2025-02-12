@@ -62,3 +62,28 @@ public class BankService {
         return 7.5;
     }
 }
+
+
+import org.eclipse.microprofile.graphql.*;
+import jakarta.enterprise.context.ApplicationScoped;
+import jakarta.inject.Inject;
+
+@GraphQLApi
+@ApplicationScoped
+public class BankService {
+
+    @Inject
+    BankServiceImpl bankServiceImpl;  // Inject BankServiceImpl
+
+    @Query
+    @Name("getBankInfo")
+    public String bankInfo() {
+        return bankServiceImpl.getBankInfo(); // Call the service method
+    }
+
+    @Query
+    @Name("interestRate")
+    public double getInterestRate() {
+        return bankServiceImpl.getInterestRate(); // Call the service method
+    }
+}
