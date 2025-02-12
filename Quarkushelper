@@ -1,3 +1,29 @@
+import jakarta.enterprise.context.ApplicationScoped;
+import jakarta.inject.Inject;
+import org.eclipse.microprofile.rest.client.inject.RestClient;
+import java.util.List;
+
+@ApplicationScoped
+public class AccountService {
+
+    @Inject
+    @RestClient
+    AccountRestClient accountRestClient;  // Inject REST client
+
+    public Account findAccountById(int accountId) {
+        return accountRestClient.getAccount(accountId);
+    }
+
+    public List<Account> getAllAccounts() {
+        return accountRestClient.getAllAccounts();
+    }
+}
+
+
+quarkus.rest-client."com.example.client.AccountRestClient".url=http://localhost:8081
+quarkus.rest-client."com.example.client.AccountRestClient".scope=ApplicationScoped
+
+
 import org.eclipse.microprofile.rest.client.inject.RegisterRestClient;
 import jakarta.ws.rs.GET;
 import jakarta.ws.rs.Path;
@@ -14,4 +40,25 @@ public interface AccountRestClient {
 
     @GET
     List<Account> getAllAccounts();
+}
+
+
+
+import org.eclipse.microprofile.graphql.*;
+
+import jakarta.enterprise.context.ApplicationScoped;
+
+@GraphQLApi  // Defines a GraphQL API
+@ApplicationScoped
+public class BankService {
+
+    @Query
+    public String bankInfo() {
+        return "Welcome to the Bank API!";
+    }
+
+    @Query
+    public double getInterestRate() {
+        return 7.5;
+    }
 }
