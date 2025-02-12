@@ -1,0 +1,17 @@
+import org.eclipse.microprofile.rest.client.inject.RegisterRestClient;
+import jakarta.ws.rs.GET;
+import jakarta.ws.rs.Path;
+import jakarta.ws.rs.PathParam;
+import java.util.List;
+
+@Path("/accounts")  // Path relative to the base URL
+@RegisterRestClient // Do not specify baseUri here, use properties instead
+public interface AccountRestClient {
+
+    @GET
+    @Path("/{id}")
+    Account getAccount(@PathParam("id") int id);
+
+    @GET
+    List<Account> getAllAccounts();
+}
