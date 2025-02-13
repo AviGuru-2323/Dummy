@@ -91,3 +91,120 @@ public class BankService {
 
 quarkus.smallrye-graphql.graphql.schema-export.enabled=true
 quarkus.smallrye-graphql.graphql.schema-export.path=/schema.graphql
+
+
+
+
+import org.eclipse.microprofile.graphql.Type;
+
+@Type
+public class KeyValue {
+    private String key;
+    private String value;
+
+    public KeyValue() {}
+
+    public KeyValue(String key, String value) {
+        this.key = key;
+        this.value = value;
+    }
+
+    public String getKey() { return key; }
+    public void setKey(String key) { this.key = key; }
+
+    public String getValue() { return value; }
+    public void setValue(String value) { this.value = value; }
+}
+
+
+import org.eclipse.microprofile.graphql.Type;
+import java.util.List;
+
+@Type
+public class KeyValueList {
+    private List<KeyValue> items;
+
+    public KeyValueList() {}
+
+    public KeyValueList(List<KeyValue> items) {
+        this.items = items;
+    }
+
+    public List<KeyValue> getItems() { return items; }
+    public void setItems(List<KeyValue> items) { this.items = items; }
+}
+
+
+
+
+import org.eclipse.microprofile.graphql.Type;
+
+@Type
+public class CustomMapEntry {
+    private String key;
+    private KeyValueList values;
+
+    public CustomMapEntry() {}
+
+    public CustomMapEntry(String key, KeyValueList values) {
+        this.key = key;
+        this.values = values;
+    }
+
+    public String getKey() { return key; }
+    public void setKey(String key) { this.key = key; }
+
+    public KeyValueList getValues() { return values; }
+    public void setValues(KeyValueList values) { this.values = values; }
+}
+
+
+import jakarta.enterprise.context.ApplicationScoped;
+import org.eclipse.microprofile.graphql.Query;
+import java.util.List;
+
+@ApplicationScoped
+public class KeyValueService {
+
+    @Query("getKeyValues")
+    public List<CustomMapEntry> getKeyValues() {
+        return List.of(
+            new CustomMapEntry("category1", new KeyValueList(List.of(
+                new KeyValue("name", "John"),
+                new KeyValue("age", "30")
+            ))),
+            new CustomMapEntry("category2", new KeyValueList(List.of(
+                new KeyValue("product", "Laptop"),
+                new KeyValue("price", "1200")
+            )))
+        );
+    }
+}
+
+
+import java.util.*;
+import java.util.stream.Collectors;
+
+public class Converter {
+
+    public List<CustomMapEntry> convertToCustomMapEntry(
+        HashMap<String, ArrayList<LinkedHashMap<String, String>>> existingData) {
+        
+        // Convert the existing HashMap to a List of CustomMapEntry
+        return existingData.entrySet().stream()
+            .map(entry -> new CustomMapEntry(entry.getKey(), convertToKeyValueList(entry.getValue())))
+            .collect(Collectors.toList());
+    }
+
+    // Convert the inner ArrayList<LinkedHashMap<String, String>> to KeyValueList
+    private KeyValueList convertToKeyValueList(ArrayList<LinkedHashMap<String, String>> list) {
+        List<KeyValue> keyValueList = list.stream()
+            .flatMap(map -> map.entrySet().stream())
+            .map(entry -> new KeyValue(entry.getKey(), entry.getValue()))
+            .collect(Collectors.toList());
+        return new KeyValueList(keyValueList);
+    }
+
+}
+
+
