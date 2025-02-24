@@ -1,0 +1,117 @@
+Since you're storing the **database password in HashiCorp Vault**, you need to prevent **Pega** from starting automatically with **Tomcat** because Tomcat expects the **password** in `context.xml`. Here’s how you can decouple Pega startup from Tomcat while dynamically retrieving the database password from Vault.
+
+---
+
+## **Solution: Delay Pega Startup & Inject Credentials at Runtime**
+### **Step 1: Remove Password from `context.xml`**
+Modify your `context.xml` to **exclude the password**, and instead, provide a placeholder or an empty value.
+
+```xml
+<Context>
+    <Resource name="jdbc/PegaRULES"
+              auth="Container"
+              type="javax.sql.DataSource"
+              factory="org.apache.tomcat.jdbc.pool.DataSourceFactory"
+              maxTotal="100"
+              maxIdle="30"
+              maxWaitMillis="10000"
+              username="pegadbuser"
+              password=""
+              driverClassName="com.mysql.cj.jdbc.Driver"
+              url="jdbc:mysql://localhost:3306/pegadb?useSSL=false&serverTimezone=UTC"/>
+</Context>
+```
+
+---
+
+### **Step 2: Configure a Custom Startup Script**
+Instead of starting Pega **directly with Tomcat**, use a **startup script** that:
+1. **Retrieves the database password from Vault**.
+2. **Injects the password into the JNDI configuration**.
+3. **Starts Tomcat with the updated credentials**.
+
+#### **Example Startup Script (`start_pega.sh`)**
+```sh
+#!/bin/bash
+
+# 1. Fetch Database Password from Vault
+VAULT_ADDR="http://vault.example.com:8200"
+VAULT_TOKEN="your-vault-token"
+VAULT_SECRET_PATH="secret/pega/db"
+
+DB_PASSWORD=$(curl -s --header "X-Vault-Token: $VAULT_TOKEN" \
+                $VAULT_ADDR/v1/$VAULT_SECRET_PATH | jq -r '.data.password')
+
+if [ -z "$DB_PASSWORD" ]; then
+  echo "Error: Could not retrieve database password from Vault"
+  exit 1
+fi
+
+# 2. Inject the Password into Tomcat's Environment Variables
+export PEGA_DB_PASSWORD="$DB_PASSWORD"
+
+# 3. Start Tomcat with Environment Variables
+echo "Starting Tomcat with Vault-based DB credentials..."
+catalina.sh run
+```
+- This script **retrieves** the password from Vault.
+- Exports it as `PEGA_DB_PASSWORD`, which can be referenced inside Tomcat or Pega.
+
+---
+
+### **Step 3: Modify `context.xml` to Use Environment Variables**
+Instead of hardcoding the password, reference the **environment variable** using **Tomcat's expression language**:
+
+```xml
+<Context>
+    <Resource name="jdbc/PegaRULES"
+              auth="Container"
+              type="javax.sql.DataSource"
+              factory="org.apache.tomcat.jdbc.pool.DataSourceFactory"
+              maxTotal="100"
+              maxIdle="30"
+              maxWaitMillis="10000"
+              username="pegadbuser"
+              password="${env.PEGA_DB_PASSWORD}"
+              driverClassName="com.mysql.cj.jdbc.Driver"
+              url="jdbc:mysql://localhost:3306/pegadb?useSSL=false&serverTimezone=UTC"/>
+</Context>
+```
+- Tomcat will **replace** `${env.PEGA_DB_PASSWORD}` with the actual password from the environment.
+
+---
+
+### **Step 4: Disable Automatic Tomcat Startup**
+Since we now start Pega manually with a script, **disable auto-start of Tomcat**:
+
+#### **For Systemd (Linux)**
+```sh
+sudo systemctl disable tomcat
+```
+
+#### **For Init.d or rc.local**
+Remove any automatic startup entries from:
+- `/etc/init.d/tomcat`
+- `/etc/rc.local`
+
+Now, **start Pega manually using `start_pega.sh`**.
+
+---
+
+### **Step 5: Secure Vault Credentials**
+- Store the **Vault Token** securely (e.g., use an IAM Role, AppRole authentication, or Kubernetes secrets).
+- Limit **access permissions** on the `start_pega.sh` script:
+  ```sh
+  chmod 700 start_pega.sh
+  ```
+- **Use a service account** to access Vault instead of hardcoding tokens.
+
+---
+
+## **Final Flow:**
+1. Tomcat does **not** start automatically.
+2. **`start_pega.sh`** fetches the password from Vault.
+3. **Injects it into the environment (`PEGA_DB_PASSWORD`)**.
+4. **Starts Tomcat**, allowing Pega to connect with the correct credentials.
+
+Would you like a more advanced solution, such as integrating Vault with a **Kubernetes or Docker-based deployment**? 🚀
