@@ -1,0 +1,32 @@
+- name: Ping FQDN and Check IP Before Running Tasks
+  hosts: all
+  gather_facts: yes
+  tasks:
+    - name: Get the IP address of the FQDN
+      command: dig +short example.com
+      register: fqdn_ip
+      changed_when: false
+      ignore_errors: yes
+
+    - name: Get the current server's IP
+      command: hostname -I | awk '{print $1}'
+      register: server_ip
+      changed_when: false
+
+    - name: Debug FQDN IP and Server IP
+      debug:
+        msg: "FQDN IP: {{ fqdn_ip.stdout.strip() }}, Server IP: {{ server_ip.stdout.strip() }}"
+
+    - name: Check if FQDN IP matches current server IP
+      set_fact:
+        ip_match: "{{ fqdn_ip.stdout.strip() == server_ip.stdout.strip() }}"
+
+    - name: Perform tasks only if IP matches
+      when: ip_match | bool
+      block:
+        - name: Task 1 - Example task
+          command: echo "Executing on matched server"
+
+        - name: Task 2 - Another example task
+          debug:
+            msg: "Running additional tasks as the IP matches"
