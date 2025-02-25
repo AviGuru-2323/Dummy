@@ -2,11 +2,12 @@
   hosts: all
   gather_facts: yes
   tasks:
-    - name: Get the IP address of the FQDN
-      command: dig +short example.com
-      register: fqdn_ip
-      changed_when: false
-      ignore_errors: yes
+- name: Get the IP address of the FQDN
+  command: dig +short test.app.treat.com | grep -Eo '([0-9]{1,3}\.){3}[0-9]{1,3}'
+  register: fqdn_ip
+  changed_when: false
+  ignore_errors: yes
+
 
     - name: Get the current server's IP
       command: hostname -I | awk '{print $1}'
