@@ -9,10 +9,10 @@
   ignore_errors: yes
 
 
-    - name: Get the current server's IP
-      command: hostname -I | awk '{print $1}'
-      register: server_ip
-      changed_when: false
+- name: Get the current server's IP using Ansible facts
+  set_fact:
+    server_ip: "{{ ansible_default_ipv4.address }}"
+
 
     - name: Debug FQDN IP and Server IP
       debug:
