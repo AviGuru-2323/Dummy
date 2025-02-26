@@ -2,11 +2,24 @@
   hosts: all
   gather_facts: yes
   tasks:
-- name: Get the IP address of the FQDN
-  command: dig +short test.app.treat.com | grep -Eo '([0-9]{1,3}\.){3}[0-9]{1,3}'
+- name: Get the raw IP addresses of the FQDN
+  command: dig +short test.app.treat.com
+  register: fqdn_raw_ips
+  changed_when: false
+  ignore_errors: yes
+
+- name: Extract valid IPv4 addresses
+  command: grep -Eo '([0-9]{1,3}\.){3}[0-9]{1,3}'
+  args:
+    stdin: "{{ fqdn_raw_ips.stdout }}"
   register: fqdn_ip
   changed_when: false
   ignore_errors: yes
+
+- name: Debug the extracted IP
+  debug:
+    msg: "FQDN IP: {{ fqdn_ip.stdout.strip() }}"
+
 
 
 - name: Get the current server's IP using Ansible facts
