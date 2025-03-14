@@ -223,3 +223,43 @@ module.exports = {
 };
 
 
+
+
+import React from "react";
+import MyHeader from "../lit-components/my-header.js";
+import MyFooter from "../lit-components/my-footer.js";
+import MyButton from "../lit-components/my-button.js";
+import MyCard from "../lit-components/my-card.js";
+import MyContainer from "../lit-components/my-container.js";
+
+function App() {
+  return (
+    <div>
+      <MyHeader title="Welcome to Lit-React Project" />
+      <MyContainer>
+        <MyCard title="Lit Card 1" content="This is the first card." />
+        <MyCard title="Lit Card 2" content="This is the second card." />
+        <MyButton label="Click Me" />
+      </MyContainer>
+      <MyFooter text="© 2025 Lit-React Project" />
+    </div>
+  );
+}
+
+export default App;
+
+
+
+import React from "react";
+import ReactDOM from "react-dom/client";
+import App from "./App";
+
+// Render the React application inside the root div
+const root = ReactDOM.createRoot(document.getElementById("root"));
+root.render(
+  <React.StrictMode>
+    <App />
+  </React.StrictMode>
+);
+
+
