@@ -1,0 +1,225 @@
+{
+  "name": "lit-react-project",
+  "version": "1.0.0",
+  "description": "A project developed using Lit and rendered in React.",
+  "scripts": {
+    "dev": "webpack serve --mode development",
+    "build": "webpack --mode production",
+    "start": "webpack serve --mode production"
+  },
+  "dependencies": {
+    "@lit-labs/react": "^1.0.0",
+    "lit": "^3.0.0",
+    "react": "^18.0.0",
+    "react-dom": "^18.0.0"
+  },
+  "devDependencies": {
+    "webpack": "^5.0.0",
+    "webpack-cli": "^5.0.0",
+    "webpack-dev-server": "^4.0.0",
+    "babel-loader": "^9.0.0",
+    "@babel/core": "^7.0.0",
+    "@babel/preset-env": "^7.0.0",
+    "@babel/preset-react": "^7.0.0"
+  }
+}
+
+
+
+// lit-components/my-header.js
+import { html, css, LitElement } from "lit";
+
+export class MyHeader extends LitElement {
+  static styles = css`
+    header {
+      background: #6200ea;
+      color: white;
+      padding: 10px;
+      text-align: center;
+    }
+  `;
+
+  render() {
+    return html`<header><h1>My Lit-React Project</h1></header>`;
+  }
+}
+customElements.define("my-header", MyHeader);
+
+// lit-components/my-footer.js
+export class MyFooter extends LitElement {
+  static styles = css`
+    footer {
+      background: #333;
+      color: white;
+      padding: 10px;
+      text-align: center;
+      position: fixed;
+      bottom: 0;
+      width: 100%;
+    }
+  `;
+
+  render() {
+    return html`<footer>© 2025 Lit-React Project</footer>`;
+  }
+}
+customElements.define("my-footer", MyFooter);
+
+// lit-components/my-button.js
+export class MyButton extends LitElement {
+  static styles = css`
+    button {
+      padding: 10px;
+      background: #ff4081;
+      color: white;
+      border: none;
+      cursor: pointer;
+    }
+  `;
+
+  render() {
+    return html`<button @click=${this.handleClick}>Click Me</button>`;
+  }
+
+  handleClick() {
+    alert("Lit Button Clicked!");
+  }
+}
+customElements.define("my-button", MyButton);
+
+// lit-components/my-card.js
+export class MyCard extends LitElement {
+  static properties = {
+    title: { type: String },
+    description: { type: String },
+  };
+
+  static styles = css`
+    .card {
+      border: 1px solid #ddd;
+      padding: 15px;
+      border-radius: 5px;
+      box-shadow: 2px 2px 5px rgba(0, 0, 0, 0.1);
+      margin: 10px;
+    }
+  `;
+
+  render() {
+    return html`
+      <div class="card">
+        <h2>${this.title}</h2>
+        <p>${this.description}</p>
+      </div>
+    `;
+  }
+}
+customElements.define("my-card", MyCard);
+
+// React wrapper (src/wrappers.js)
+import { createComponent } from "@lit-labs/react";
+import * as React from "react";
+import { MyHeader } from "../lit-components/my-header";
+import { MyFooter } from "../lit-components/my-footer";
+import { MyButton } from "../lit-components/my-button";
+import { MyCard } from "../lit-components/my-card";
+
+export const ReactHeader = createComponent({ react: React, tagName: "my-header", elementClass: MyHeader });
+export const ReactFooter = createComponent({ react: React, tagName: "my-footer", elementClass: MyFooter });
+export const ReactButton = createComponent({ react: React, tagName: "my-button", elementClass: MyButton });
+export const ReactCard = createComponent({ react: React, tagName: "my-card", elementClass: MyCard });
+
+// React App (src/App.js)
+import React from "react";
+import { ReactHeader, ReactFooter, ReactButton, ReactCard } from "./wrappers";
+
+function App() {
+  return (
+    <div>
+      <ReactHeader />
+      <ReactButton />
+      <ReactCard title="Lit-React Card" description="This is a card rendered in React but built using Lit!" />
+      <ReactFooter />
+    </div>
+  );
+}
+export default App;
+
+
+
+
+
+
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Lit-React Project</title>
+</head>
+<body>
+    <div id="root"></div>
+</body>
+</html>
+
+
+
+{
+  "presets": ["@babel/preset-env", "@babel/preset-react"]
+}
+
+
+
+lit-react-project/
+├── lit-components/
+│   ├── my-header.js
+│   ├── my-footer.js
+│   ├── my-button.js
+│   ├── my-card.js
+│   ├── my-container.js
+├── src/
+│   ├── App.js
+│   ├── index.js
+├── public/
+│   ├── index.html
+├── webpack.config.js
+├── package.json
+├── .babelrc
+├── README.md
+
+
+
+const path = require("path");
+const HtmlWebpackPlugin = require("html-webpack-plugin");
+
+module.exports = {
+  entry: "./src/index.js",
+  output: {
+    path: path.resolve(__dirname, "dist"),
+    filename: "bundle.js",
+  },
+  module: {
+    rules: [
+      {
+        test: /\.js$/,
+        exclude: /node_modules/,
+        use: {
+          loader: "babel-loader",
+        },
+      },
+    ],
+  },
+  plugins: [
+    new HtmlWebpackPlugin({
+      template: "./public/index.html",
+    }),
+  ],
+  devServer: {
+    static: "./dist",
+    hot: true,
+    port: 3000,
+  },
+  mode: "development",
+};
+
+
