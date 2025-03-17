@@ -1,0 +1,78 @@
+import { useEffect } from "react";
+import { createComponent } from "@lit/react";
+import { html, css, LitElement } from "lit";
+
+// Define the Lit Button Component
+class MyButton extends LitElement {
+  static styles = css`
+    button {
+      background: blue;
+      color: white;
+      padding: 10px;
+      border: none;
+      cursor: pointer;
+    }
+  `;
+  render() {
+    return html`<button @click=${() => alert("Button Clicked!")}>Click Me</button>`;
+  }
+}
+customElements.define("my-button", MyButton);
+
+// Define the Lit Card Component
+class MyCard extends LitElement {
+  static styles = css`
+    div {
+      border: 1px solid #ccc;
+      padding: 20px;
+      border-radius: 10px;
+    }
+  `;
+  render() {
+    return html`<div><slot></slot></div>`;
+  }
+}
+customElements.define("my-card", MyCard);
+
+// Define the Lit Modal Component
+class MyModal extends LitElement {
+  static styles = css`
+    div {
+      position: fixed;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      background: white;
+      padding: 20px;
+      box-shadow: 0 0 10px rgba(0, 0, 0, 0.2);
+    }
+  `;
+  render() {
+    return html`<div><slot></slot></div>`;
+  }
+}
+customElements.define("my-modal", MyModal);
+
+// Convert Lit Components to React Components
+const ReactButton = createComponent({ react: React, tagName: "my-button", elementClass: MyButton });
+const ReactCard = createComponent({ react: React, tagName: "my-card", elementClass: MyCard });
+const ReactModal = createComponent({ react: React, tagName: "my-modal", elementClass: MyModal });
+
+// Main App Component
+export default function App() {
+  useEffect(() => {
+    import("lit");
+  }, []);
+  return (
+    <div>
+      <h1>React with Lit Components</h1>
+      <ReactButton />
+      <ReactCard>
+        <p>This is a Lit Card inside a React Component!</p>
+      </ReactCard>
+      <ReactModal>
+        <p>This is a Lit Modal inside a React Component!</p>
+      </ReactModal>
+    </div>
+  );
+}
