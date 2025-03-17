@@ -182,3 +182,24 @@ npm run dev
     "vite": "^4.4.9"
   }
 }
+
+
+npm install vite-plugin-static-copy --save-dev
+
+
+import { defineConfig } from "vite";
+import react from "@vitejs/plugin-react";
+import { viteStaticCopy } from "vite-plugin-static-copy";
+
+export default defineConfig({
+  plugins: [
+    react(),
+    viteStaticCopy({
+      targets: [
+        { src: "node_modules/@devkit/webkit/**/*", dest: "vendor/devkit/webkit" },
+        { src: "node_modules/@devkit/icons/**/*", dest: "vendor/devkit/icons" },
+      ],
+    }),
+  ],
+});
+
