@@ -1,78 +1,164 @@
-import { useEffect } from "react";
-import { createComponent } from "@lit/react";
-import { html, css, LitElement } from "lit";
+npm install lit @lit/react
 
-// Define the Lit Button Component
+{
+  "name": "react-lit-integration",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview"
+  },
+  "dependencies": {
+    "@lit/react": "^1.3.0",
+    "lit": "^3.1.0",
+    "react": "^18.2.0",
+    "react-dom": "^18.2.0"
+  },
+  "devDependencies": {
+    "@vitejs/plugin-react": "^4.0.0",
+    "vite": "^5.0.0"
+  }
+}
+
+ src/components/lit/MyButton.js
+
+import { LitElement, html, css } from "lit";
+
 class MyButton extends LitElement {
   static styles = css`
     button {
       background: blue;
       color: white;
-      padding: 10px;
+      padding: 10px 20px;
       border: none;
       cursor: pointer;
     }
   `;
+
   render() {
-    return html`<button @click=${() => alert("Button Clicked!")}>Click Me</button>`;
+    return html`<button @click=${this._handleClick}>Click Me</button>`;
+  }
+
+  _handleClick() {
+    alert("Button Clicked!");
   }
 }
+
 customElements.define("my-button", MyButton);
 
-// Define the Lit Card Component
+
+
+src/components/lit/MyCard.js
+
+import { LitElement, html, css } from "lit";
+
 class MyCard extends LitElement {
   static styles = css`
-    div {
+    .card {
       border: 1px solid #ccc;
       padding: 20px;
-      border-radius: 10px;
+      border-radius: 8px;
+      box-shadow: 2px 2px 10px rgba(0, 0, 0, 0.1);
     }
   `;
+
   render() {
-    return html`<div><slot></slot></div>`;
+    return html`<div class="card"><slot></slot></div>`;
   }
 }
+
 customElements.define("my-card", MyCard);
 
-// Define the Lit Modal Component
+
+src/components/lit/MyModal.js
+import { LitElement, html, css } from "lit";
+
 class MyModal extends LitElement {
   static styles = css`
-    div {
+    .modal {
       position: fixed;
       top: 50%;
       left: 50%;
       transform: translate(-50%, -50%);
       background: white;
       padding: 20px;
-      box-shadow: 0 0 10px rgba(0, 0, 0, 0.2);
+      border: 1px solid #ccc;
+      box-shadow: 2px 2px 10px rgba(0, 0, 0, 0.2);
     }
   `;
+
   render() {
-    return html`<div><slot></slot></div>`;
+    return html`<div class="modal"><slot></slot></div>`;
   }
 }
+
 customElements.define("my-modal", MyModal);
 
-// Convert Lit Components to React Components
-const ReactButton = createComponent({ react: React, tagName: "my-button", elementClass: MyButton });
-const ReactCard = createComponent({ react: React, tagName: "my-card", elementClass: MyCard });
-const ReactModal = createComponent({ react: React, tagName: "my-modal", elementClass: MyModal });
+ src/components/react-wrappers/LitComponents.js
 
-// Main App Component
-export default function App() {
-  useEffect(() => {
-    import("lit");
-  }, []);
+import { createComponent } from "@lit/react";
+import React from "react";
+import "../../components/lit/MyButton.js";
+import "../../components/lit/MyCard.js";
+import "../../components/lit/MyModal.js";
+
+// Wrap Lit components for React usage
+export const MyButton = createComponent({
+  react: React,
+  tagName: "my-button",
+  elementClass: customElements.get("my-button"),
+});
+
+export const MyCard = createComponent({
+  react: React,
+  tagName: "my-card",
+  elementClass: customElements.get("my-card"),
+});
+
+export const MyModal = createComponent({
+  react: React,
+  tagName: "my-modal",
+  elementClass: customElements.get("my-modal"),
+});
+
+
+src/App.jsx:
+
+import React, { useState } from "react";
+import { MyButton, MyCard, MyModal } from "./components/react-wrappers/LitComponents";
+
+function App() {
+  const [showModal, setShowModal] = useState(false);
+
   return (
-    <div>
-      <h1>React with Lit Components</h1>
-      <ReactButton />
-      <ReactCard>
-        <p>This is a Lit Card inside a React Component!</p>
-      </ReactCard>
-      <ReactModal>
-        <p>This is a Lit Modal inside a React Component!</p>
-      </ReactModal>
+    <div style={{ padding: "20px", textAlign: "center" }}>
+      <h1>React + Lit Integration</h1>
+      
+      <MyCard>
+        <p>This is a Lit-based card inside React.</p>
+      </MyCard>
+
+      <br />
+
+      <MyButton onClick={() => setShowModal(true)} />
+
+      {showModal && (
+        <MyModal>
+          <p>This is a Lit modal.</p>
+          <button onClick={() => setShowModal(false)}>Close</button>
+        </MyModal>
+      )}
     </div>
   );
 }
+
+export default App;
+
+
+npm run dev
+
+
+
+
