@@ -1,0 +1,193 @@
+import { createContext } from '@lit-labs/context';
+import { ReactiveControllerHost } from '@lit/reactive-element';
+
+// Create a global context key
+export const appContext = createContext('app-context');
+
+// Define a generic context store
+export class AppStore extends ReactiveControllerHost {
+  constructor() {
+    super();
+    this.state = {
+      currentRoute: '/',  // Tracks current navigation
+      user: null,         // Stores user info
+      theme: 'light',     // Theme state
+      cart: []            // Shared cart state
+    };
+  }
+
+  // Generic method to update any state
+  updateState(key, value) {
+    this.state = { ...this.state, [key]: value };
+    this.requestUpdate(); // Notify changes
+  }
+
+  // Navigation function
+  navigateTo(route) {
+    this.updateState('currentRoute', route);
+    window.history.pushState({}, '', route);
+    window.dispatchEvent(new Event('popstate')); // Trigger navigation update
+  }
+
+  // User authentication actions
+  login(user) {
+    this.updateState('user', user);
+  }
+
+  logout() {
+    this.updateState('user', null);
+  }
+
+  // Theme toggle
+  toggleTheme() {
+    this.updateState('theme', this.state.theme === 'light' ? 'dark' : 'light');
+  }
+}
+
+
+import { LitElement, html } from 'lit';
+import { provide } from '@lit-labs/context';
+import { appContext, AppStore } from './app-context.js';
+
+import './home-page.js';
+import './profile-page.js';
+import './settings-page.js';
+import './cart-page.js';
+
+class MyApp extends LitElement {
+  @provide({ context: appContext }) appStore = new AppStore();
+
+  connectedCallback() {
+    super.connectedCallback();
+    window.addEventListener('popstate', () => {
+      this.appStore.updateState('currentRoute', window.location.pathname);
+    });
+  }
+
+  render() {
+    return html`
+      <nav>
+        <button @click=${() => this.appStore.navigateTo('/')}>Home</button>
+        <button @click=${() => this.appStore.navigateTo('/profile')}>Profile</button>
+        <button @click=${() => this.appStore.navigateTo('/settings')}>Settings</button>
+        <button @click=${() => this.appStore.navigateTo('/cart')}>Cart (${this.appStore.state.cart.length})</button>
+      </nav>
+
+      <main>
+        ${this.renderPage()}
+      </main>
+    `;
+  }
+
+  renderPage() {
+    switch (this.appStore.state.currentRoute) {
+      case '/profile': return html`<profile-page></profile-page>`;
+      case '/settings': return html`<settings-page></settings-page>`;
+      case '/cart': return html`<cart-page></cart-page>`;
+      default: return html`<home-page></home-page>`;
+    }
+  }
+}
+
+customElements.define('my-app', MyApp);
+
+
+
+import { LitElement, html } from 'lit';
+import { consume } from '@lit-labs/context';
+import { appContext } from './app-context.js';
+
+class HomePage extends LitElement {
+  @consume({ context: appContext }) appStore;
+
+  render() {
+    return html`
+      <h1>Welcome, ${this.appStore.state.user ? this.appStore.state.user.name : 'Guest'}</h1>
+      <p>Current Theme: ${this.appStore.state.theme}</p>
+      <button @click=${() => this.appStore.toggleTheme()}>Toggle Theme</button>
+      <button @click=${() => this.appStore.login({ name: 'John Doe' })}>Login</button>
+    `;
+  }
+}
+
+customElements.define('home-page', HomePage);
+
+
+
+import { LitElement, html } from 'lit';
+import { consume } from '@lit-labs/context';
+import { appContext } from './app-context.js';
+
+class ProfilePage extends LitElement {
+  @consume({ context: appContext }) appStore;
+
+  render() {
+    const user = this.appStore.state.user;
+    return html`
+      <h1>Profile</h1>
+      ${user
+        ? html`<p>Name: ${user.name}</p>
+            <button @click=${() => this.appStore.logout()}>Logout</button>`
+        : html`<p>Please log in.</p>`}
+    `;
+  }
+}
+
+customElements.define('profile-page', ProfilePage);
+
+
+import { LitElement, html } from 'lit';
+import { consume } from '@lit-labs/context';
+import { appContext } from './app-context.js';
+
+class SettingsPage extends LitElement {
+  @consume({ context: appContext }) appStore;
+
+  render() {
+    return html`
+      <h1>Settings</h1>
+      <p>Current Theme: ${this.appStore.state.theme}</p>
+      <button @click=${() => this.appStore.toggleTheme()}>Toggle Theme</button>
+    `;
+  }
+}
+
+customElements.define('settings-page', SettingsPage);
+
+
+import { LitElement, html } from 'lit';
+import { consume } from '@lit-labs/context';
+import { appContext } from './app-context.js';
+
+class CartPage extends LitElement {
+  @consume({ context: appContext }) appStore;
+
+  removeFromCart(productId) {
+    this.appStore.updateState(
+      'cart',
+      this.appStore.state.cart.filter(item => item.id !== productId)
+    );
+  }
+
+  render() {
+    return html`
+      <h1>Your Cart</h1>
+      <ul>
+        ${this.appStore.state.cart.length > 0
+          ? this.appStore.state.cart.map(
+              (item) => html`
+                <li>
+                  ${item.name} - $${item.price}
+                  <button @click=${() => this.removeFromCart(item.id)}>Remove</button>
+                </li>
+              `
+            )
+          : html`<p>Your cart is empty</p>`}
+      </ul>
+    `;
+  }
+}
+
+customElements.define('cart-page', CartPage);
+
+
