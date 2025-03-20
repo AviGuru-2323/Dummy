@@ -1,3 +1,82 @@
+import { createContext } from '@lit/context';
+
+export const appContext = createContext('app-context');
+
+export class AppContextProvider {
+  constructor() {
+    this.state = {
+      user: null,
+      cart: [],
+      currentPage: 'home',
+    };
+
+    // ✅ Bind methods so they can be used in consumers
+    this.goToPage = this.goToPage.bind(this);
+    this.login = this.login.bind(this);
+    this.logout = this.logout.bind(this);
+    this.addToCart = this.addToCart.bind(this);
+    this.removeFromCart = this.removeFromCart.bind(this);
+  }
+
+  updateState(key, value) {
+    this.state = { ...this.state, [key]: value };
+  }
+
+  login(user) {
+    this.updateState('user', user);
+  }
+
+  logout() {
+    this.updateState('user', null);
+  }
+
+  addToCart(item) {
+    this.updateState('cart', [...this.state.cart, item]);
+  }
+
+  removeFromCart(id) {
+    this.updateState('cart', this.state.cart.filter((item) => item.id !== id));
+  }
+
+  goToPage(page) {
+    this.updateState('currentPage', page);
+    window.history.pushState({}, '', page);
+  }
+}
+
+
+
+import { LitElement, html } from 'lit';
+import { ContextProvider } from '@lit/context';
+import { appContext, AppContextProvider } from './context/app-context.js';
+import { createRouter } from './router/app-router.js';
+
+import './components/navbar.js';
+
+class MyApp extends LitElement {
+  constructor() {
+    super();
+    this.appStore = new AppContextProvider();
+  }
+
+  firstUpdated() {
+    // ✅ Provide Context Globally
+    new ContextProvider(this, { context: appContext, value: this.appStore });
+  }
+
+  router = createRouter(this);
+
+  render() {
+    return html`
+      <navbar></navbar>
+      ${this.router.outlet()}
+    `;
+  }
+}
+
+customElements.define('my-app', MyApp);
+
+
 import { LitElement, html } from 'lit';
 import { consume } from '@lit/context';
 import { appContext } from '../context/app-context.js';
@@ -35,3 +114,4 @@ class Navbar extends LitElement {
 }
 
 customElements.define('navbar', Navbar);
+
