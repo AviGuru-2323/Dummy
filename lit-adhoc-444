@@ -1,0 +1,52 @@
+// router.js (Centralized Router File)
+import { Router } from '@lit-labs/router';
+
+export const appRouter = new Router(null, [
+  { path: '/', render: () => document.createElement('home-page') },
+  { path: '/profile/:id', render: (params) => {
+      const el = document.createElement('profile-page');
+      el.userId = params.id;
+      return el;
+    }
+  }
+]);
+
+import { LitElement, html } from 'lit';
+import { appRouter } from './router.js';
+import './navbar.js';
+import './home.js';
+import './profile.js';
+
+class MyApp extends LitElement {
+  constructor() {
+    super();
+    this.router = appRouter;
+    this.router.host = this; // Attach router to LitElement
+  }
+
+  render() {
+    return html`
+      <navbar></navbar>
+      ${this.router.outlet()}
+    `;
+  }
+}
+
+customElements.define('my-app', MyApp);
+
+
+import { LitElement, html } from 'lit';
+import { appRouter } from './router.js';
+
+class Navbar extends LitElement {
+  render() {
+    return html`
+      <nav>
+        <button @click=${() => appRouter.goto('/')}>Home</button>
+        <button @click=${() => appRouter.goto('/profile/123')}>Profile</button>
+      </nav>
+    `;
+  }
+}
+
+customElements.define('navbar', Navbar);
