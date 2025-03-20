@@ -1,45 +1,37 @@
-import { createContext, ContextProvider, ContextConsumer } from '@lit/context';
+import { LitElement, html } from 'lit';
+import { consume } from '@lit/context';
+import { appContext } from '../context/app-context.js';
 
-export const appContext = createContext('app-context');
+class Navbar extends LitElement {
+  static properties = {
+    appStore: { type: Object },
+  };
 
-export class AppContextProvider {
   constructor() {
-    this.state = {
-      user: null,
-      cart: [],
-      currentPage: 'home',
-    };
-
-    // ✅ Bind methods so they can be used in consumers
-    this.goToPage = this.goToPage.bind(this);
-    this.login = this.login.bind(this);
-    this.logout = this.logout.bind(this);
-    this.addToCart = this.addToCart.bind(this);
-    this.removeFromCart = this.removeFromCart.bind(this);
+    super();
+    this.appStore = undefined;
   }
 
-  updateState(key, value) {
-    this.state = { ...this.state, [key]: value };
+  // ✅ Consume Context Using Lit’s @consume Decorator
+  @consume({ context: appContext, subscribe: true })
+  set context(value) {
+    this.appStore = value;
+    this.requestUpdate(); // ✅ Ensure UI updates when context is available
   }
 
-  login(user) {
-    this.updateState('user', user);
-  }
+  render() {
+    if (!this.appStore) {
+      return html`<p>Loading...</p>`;
+    }
 
-  logout() {
-    this.updateState('user', null);
-  }
-
-  addToCart(item) {
-    this.updateState('cart', [...this.state.cart, item]);
-  }
-
-  removeFromCart(id) {
-    this.updateState('cart', this.state.cart.filter((item) => item.id !== id));
-  }
-
-  goToPage(page) {
-    this.updateState('currentPage', page);
-    window.history.pushState({}, '', page); // Simulate navigation
+    return html`
+      <nav>
+        <button @click=${() => this.appStore.goToPage('/')}>Home</button>
+        <button @click=${() => this.appStore.goToPage('/profile/123')}>Profile</button>
+        <button @click=${() => this.appStore.goToPage('/cart')}>Cart</button>
+      </nav>
+    `;
   }
 }
+
+customElements.define('navbar', Navbar);
