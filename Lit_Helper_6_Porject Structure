@@ -1,0 +1,167 @@
+/lit-app
+ ├── /src
+ │    ├── /components       # Reusable UI components
+ │    │    ├── navbar.js
+ │    │    ├── button.js
+ │    ├── /pages            # Page-level components (connected to routes)
+ │    │    ├── home-page.js
+ │    │    ├── profile-page.js
+ │    │    ├── cart-page.js
+ │    ├── /router           # Centralized routing logic
+ │    │    ├── app-router.js
+ │    ├── /context          # Global state management
+ │    │    ├── app-context.js
+ │    ├── app.js            # Root component (sets up router and context)
+ │    ├── index.js          # Entry point (imports app.js)
+ ├── package.json
+ ├── vite.config.js         # Development server config
+ ├── README.md
+
+
+
+
+import { createContext } from '@lit-labs/context';
+import { ReactiveControllerHost } from '@lit/reactive-element';
+
+export const appContext = createContext('app-context');
+
+export class AppStore extends ReactiveControllerHost {
+  constructor() {
+    super();
+    this.state = {
+      user: null,
+      cart: [],
+      currentPage: 'home',
+    };
+  }
+
+  updateState(key, value) {
+    this.state = { ...this.state, [key]: value };
+    this.requestUpdate();
+  }
+
+  login = (user) => this.updateState('user', user);
+  logout = () => this.updateState('user', null);
+  addToCart = (item) => this.updateState('cart', [...this.state.cart, item]);
+  removeFromCart = (id) => this.updateState('cart', this.state.cart.filter((item) => item.id !== id));
+  goToPage = (page) => this.updateState('currentPage', page);
+}
+
+
+import { Router } from '@lit-labs/router';
+import { html } from 'lit';
+
+import '../pages/home-page.js';
+import '../pages/profile-page.js';
+import '../pages/cart-page.js';
+
+export const createRouter = (context) =>
+  new Router(context, [
+    { path: '/', render: () => html`<home-page></home-page>` },
+    { path: '/profile/:id', render: ({ id }) => html`<profile-page userid="${id}"></profile-page>` },
+    { path: '/cart', render: () => html`<cart-page></cart-page>` },
+  ]);
+
+
+import { LitElement, html } from 'lit';
+import { provide } from '@lit-labs/context';
+import { appContext, AppStore } from './context/app-context.js';
+import { createRouter } from './router/app-router.js';
+
+import './components/navbar.js';
+
+class MyApp extends LitElement {
+  @provide({ context: appContext }) appStore = new AppStore();
+  router = createRouter(this);
+
+  render() {
+    return html`
+      <navbar></navbar>
+      ${this.router.outlet()}
+    `;
+  }
+}
+
+customElements.define('my-app', MyApp);
+
+
+import { LitElement, html } from 'lit';
+import { consume } from '@lit-labs/context';
+import { appContext } from '../context/app-context.js';
+
+class Navbar extends LitElement {
+  @consume({ context: appContext }) appStore;
+
+  render() {
+    return html`
+      <nav>
+        <button @click=${() => this.appStore.goToPage('/')}>Home</button>
+        <button @click=${() => this.appStore.goToPage('/profile/123')}>Profile</button>
+        <button @click=${() => this.appStore.goToPage('/cart')}>Cart</button>
+      </nav>
+    `;
+  }
+}
+
+customElements.define('navbar', Navbar);
+
+
+import { LitElement, html } from 'lit';
+
+class HomePage extends LitElement {
+  render() {
+    return html`<h1>Home Page</h1>`;
+  }
+}
+
+customElements.define('home-page', HomePage);
+
+
+import { LitElement, html } from 'lit';
+
+class ProfilePage extends LitElement {
+  static properties = {
+    userid: { type: String },
+  };
+
+  render() {
+    return html`
+      <h1>Profile Page</h1>
+      <p>User ID: ${this.userid}</p>
+    `;
+  }
+}
+
+customElements.define('profile-page', ProfilePage);
+
+
+import { LitElement, html } from 'lit';
+import { consume } from '@lit-labs/context';
+import { appContext } from '../context/app-context.js';
+
+class CartPage extends LitElement {
+  @consume({ context: appContext }) appStore;
+
+  addItem() {
+    this.appStore.addToCart({ id: 1, name: 'Laptop', price: 999 });
+  }
+
+  navigateToProfile() {
+    this.appStore.goToPage('/profile/123');
+  }
+
+  render() {
+    return html`
+      <h1>Cart</h1>
+      <button @click=${this.addItem}>Add Laptop</button>
+      <ul>
+        ${this.appStore.state.cart.map((item) => html`<li>${item.name} - $${item.price}</li>`)}
+      </ul>
+      <button @click=${this.navigateToProfile}>Go to Profile</button>
+    `;
+  }
+}
+
+customElements.define('cart-page', CartPage);
+
+
