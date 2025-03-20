@@ -1,0 +1,168 @@
+import { createContext } from '@lit-labs/context';
+import { ReactiveControllerHost } from '@lit/reactive-element';
+
+// Create a context key
+export const appContext = createContext('app-context');
+
+export class AppStore extends ReactiveControllerHost {
+  constructor() {
+    super();
+    this.state = {
+      cart: [],
+      user: null,
+      theme: 'light'
+    };
+  }
+
+  // Generic method to update state
+  updateState(key, value) {
+    this.state = { ...this.state, [key]: value };
+    this.requestUpdate(); // Triggers UI update
+  }
+
+  // Helper methods for common actions
+  addToCart(product) {
+    this.updateState('cart', [...this.state.cart, product]);
+  }
+
+  removeFromCart(productId) {
+    this.updateState(
+	
+      'cart',
+      this.state.cart.filter(item => item.id !== productId)
+    );
+  }
+
+  login(user) {
+    this.updateState('user', user);
+  }
+
+  logout() {
+    this.updateState('user', null);
+  }
+
+  toggleTheme() {
+    this.updateState('theme', this.state.theme === 'light' ? 'dark' : 'light');
+  }
+}
+
+	
+
+import { LitElement, html } from 'lit';
+import { provide } from '@lit-labs/context';
+import { appContext, AppStore } from './app-context.js';
+
+import './home-page.js';
+import './cart-page.js';
+
+class MyApp extends LitElement {
+  @provide({ context: appContext }) appStore = new AppStore();
+
+  render() {
+    return html`
+      <nav>
+        <a href="/">Home</a>
+        <a href="/cart">Cart (${this.appStore.state.cart.length})</a>
+        ${this.appStore.state.user
+          ? html`
+              <button @click=${() => this.appStore.logout()}>Logout</button>
+            `
+          : html`
+              <button @click=${() => this.appStore.login({ name: 'John Doe' })}>
+                Login
+              </button>
+            `}
+        <button @click=${() => this.appStore.toggleTheme()}>
+          Toggle Theme (${this.appStore.state.theme})
+        </button>
+      </nav>
+
+      <slot></slot>
+    `;
+  }
+}
+
+customElements.define('my-app', MyApp);
+
+
+import { LitElement, html } from 'lit';
+import { consume } from '@lit-labs/context';
+import { appContext } from './app-context.js';
+
+class HomePage extends LitElement {
+  @consume({ context: appContext }) appStore;
+
+  render() {
+    return html`
+      <h1>Welcome, ${this.appStore.state.user ? this.appStore.state.user.name : 'Guest'}</h1>
+      <p>Current Theme: ${this.appStore.state.theme}</p>
+      <button @click=${() => this.appStore.toggleTheme()}>Toggle Theme</button>
+    `;
+  }
+}
+
+customElements.define('home-page', HomePage);
+
+
+import { LitElement, html } from 'lit';
+import { consume } from '@lit-labs/context';
+import { appContext } from './app-context.js';
+
+class CartPage extends LitElement {
+  @consume({ context: appContext }) appStore;
+
+  removeFromCart(productId) {
+    this.appStore.removeFromCart(productId);
+  }
+
+  render() {
+    return html`
+      <h1>Your Cart</h1>
+      <ul>
+        ${this.appStore.state.cart.length > 0
+          ? this.appStore.state.cart.map(
+              (item) => html`
+                <li>
+                  ${item.name} - $${item.price}
+                  <button @click=${() => this.removeFromCart(item.id)}>Remove</button>
+                </li>
+              `
+            )
+          : html`<p>Your cart is empty</p>`}
+      </ul>
+    `;
+  }
+}
+
+customElements.define('cart-page', CartPage);
+
+
+import { LitElement, html } from 'lit';
+import { consume } from '@lit-labs/context';
+import { appContext } from './app-context.js';
+
+class ProductPage extends LitElement {
+  @consume({ context: appContext }) appStore;
+
+  static properties = {
+    product: { type: Object }
+  };
+
+  constructor() {
+    super();
+    this.product = { id: 1, name: 'Laptop', price: 999 };
+  }
+
+  render() {
+    return html`
+      <h1>${this.product.name}</h1>
+      <p>Price: $${this.product.price}</p>
+      <button @click=${() => this.appStore.addToCart(this.product)}>Add to Cart</button>
+    `;
+  }
+}
+
+customElements.define('product-page', ProductPage);
+
+
+
