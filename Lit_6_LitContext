@@ -1,0 +1,168 @@
+import { createContext, ContextProvider, ContextConsumer } from '@lit/context';
+import { ReactiveControllerHost } from 'lit';
+
+export const appContext = createContext('app-context');
+
+export class AppContextProvider extends ReactiveControllerHost {
+  constructor() {
+    super();
+    this.state = {
+      user: null,
+      cart: [],
+      currentPage: 'home',
+    };
+  }
+
+  updateState(key, value) {
+    this.state = { ...this.state, [key]: value };
+    this.requestUpdate();
+  }
+
+  login = (user) => this.updateState('user', user);
+  logout = () => this.updateState('user', null);
+  addToCart = (item) => this.updateState('cart', [...this.state.cart, item]);
+  removeFromCart = (id) => this.updateState('cart', this.state.cart.filter((item) => item.id !== id));
+  goToPage = (page) => this.updateState('currentPage', page);
+}
+
+export class AppContextConsumer extends ContextConsumer {
+  constructor(host) {
+    super(host);
+    this.context = appContext;
+  }
+}
+
+
+import { Router } from '@lit-labs/router';
+import { html } from 'lit';
+
+import '../pages/home-page.js';
+import '../pages/profile-page.js';
+import '../pages/cart-page.js';
+
+export const createRouter = (context) =>
+  new Router(context, [
+    { path: '/', render: () => html`<home-page></home-page>` },
+    { path: '/profile/:id', render: ({ id }) => html`<profile-page userid="${id}"></profile-page>` },
+    { path: '/cart', render: () => html`<cart-page></cart-page>` },
+  ]);
+
+
+import { LitElement, html } from 'lit';
+import { ContextProvider } from '@lit/context';
+import { appContext, AppContextProvider } from './context/app-context.js';
+import { createRouter } from './router/app-router.js';
+
+import './components/navbar.js';
+
+class MyApp extends LitElement {
+  constructor() {
+    super();
+    this.appStore = new AppContextProvider();
+  }
+
+  static get properties() {
+    return { appStore: { state: true } };
+  }
+
+  firstUpdated() {
+    new ContextProvider(this, { context: appContext, value: this.appStore });
+  }
+
+  router = createRouter(this);
+
+  render() {
+    return html`
+      <navbar></navbar>
+      ${this.router.outlet()}
+    `;
+  }
+}
+
+customElements.define('my-app', MyApp);
+
+
+import { LitElement, html } from 'lit';
+import { AppContextConsumer } from '../context/app-context.js';
+
+class Navbar extends LitElement {
+  constructor() {
+    super();
+    this.appStore = new AppContextConsumer(this);
+  }
+
+  render() {
+    return html`
+      <nav>
+        <button @click=${() => this.appStore.goToPage('/')}>Home</button>
+        <button @click=${() => this.appStore.goToPage('/profile/123')}>Profile</button>
+        <button @click=${() => this.appStore.goToPage('/cart')}>Cart</button>
+      </nav>
+    `;
+  }
+}
+
+customElements.define('navbar', Navbar);
+
+
+import { LitElement, html } from 'lit';
+
+class HomePage extends LitElement {
+  render() {
+    return html`<h1>Home Page</h1>`;
+  }
+}
+
+customElements.define('home-page', HomePage);
+
+
+import { LitElement, html } from 'lit';
+
+class ProfilePage extends LitElement {
+  static properties = {
+    userid: { type: String },
+  };
+
+  render() {
+    return html`
+      <h1>Profile Page</h1>
+      <p>User ID: ${this.userid}</p>
+    `;
+  }
+}
+
+customElements.define('profile-page', ProfilePage);
+
+
+import { LitElement, html } from 'lit';
+import { AppContextConsumer } from '../context/app-context.js';
+
+class CartPage extends LitElement {
+  constructor() {
+    super();
+    this.appStore = new AppContextConsumer(this);
+  }
+
+  addItem() {
+    this.appStore.addToCart({ id: 1, name: 'Laptop', price: 999 });
+  }
+
+  navigateToProfile() {
+    this.appStore.goToPage('/profile/123');
+  }
+
+  render() {
+    return html`
+      <h1>Cart</h1>
+      <button @click=${this.addItem}>Add Laptop</button>
+      <ul>
+        ${this.appStore.state.cart.map((item) => html`<li>${item.name} - $${item.price}</li>`)}
+      </ul>
+      <button @click=${this.navigateToProfile}>Go to Profile</button>
+    `;
+  }
+}
+
+customElements.define('cart-page', CartPage);
+
+
