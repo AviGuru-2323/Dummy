@@ -1,117 +1,35 @@
-import { createContext } from '@lit/context';
-
-export const appContext = createContext('app-context');
-
-export class AppContextProvider {
-  constructor() {
-    this.state = {
-      user: null,
-      cart: [],
-      currentPage: 'home',
-    };
-
-    // ✅ Bind methods so they can be used in consumers
-    this.goToPage = this.goToPage.bind(this);
-    this.login = this.login.bind(this);
-    this.logout = this.logout.bind(this);
-    this.addToCart = this.addToCart.bind(this);
-    this.removeFromCart = this.removeFromCart.bind(this);
-  }
-
-  updateState(key, value) {
-    this.state = { ...this.state, [key]: value };
-  }
-
-  login(user) {
-    this.updateState('user', user);
-  }
-
-  logout() {
-    this.updateState('user', null);
-  }
-
-  addToCart(item) {
-    this.updateState('cart', [...this.state.cart, item]);
-  }
-
-  removeFromCart(id) {
-    this.updateState('cart', this.state.cart.filter((item) => item.id !== id));
-  }
-
-  goToPage(page) {
-    this.updateState('currentPage', page);
-    window.history.pushState({}, '', page);
-  }
-}
-
-
-
 import { LitElement, html } from 'lit';
 import { ContextProvider } from '@lit/context';
-import { appContext, AppContextProvider } from './context/app-context.js';
-import { createRouter } from './router/app-router.js';
-
-import './components/navbar.js';
+import { appContext } from './app-context.js';
+import './navbar.js';
 
 class MyApp extends LitElement {
   constructor() {
     super();
-    this.appStore = new AppContextProvider();
+    
+    this.appStore = {
+      goToPage: (page) => {
+        console.log(`Navigating to ${page}`);
+      },
+    };
+    
+    // ✅ Create ContextProvider immediately in constructor
+    this.contextProvider = new ContextProvider(this, { context: appContext });
   }
 
-  firstUpdated() {
-    // ✅ Provide Context Globally
-    new ContextProvider(this, { context: appContext, value: this.appStore });
+  connectedCallback() {
+    super.connectedCallback();
+    
+    // ✅ Set the value BEFORE first render
+    this.contextProvider.setValue(this.appStore);
   }
-
-  router = createRouter(this);
 
   render() {
     return html`
       <navbar></navbar>
-      ${this.router.outlet()}
+      <p>Current Page</p>
     `;
   }
 }
 
 customElements.define('my-app', MyApp);
-
-
-import { LitElement, html } from 'lit';
-import { consume } from '@lit/context';
-import { appContext } from '../context/app-context.js';
-
-class Navbar extends LitElement {
-  static properties = {
-    appStore: { type: Object },
-  };
-
-  constructor() {
-    super();
-    this.appStore = undefined;
-  }
-
-  // ✅ Consume Context Using Lit’s @consume Decorator
-  @consume({ context: appContext, subscribe: true })
-  set context(value) {
-    this.appStore = value;
-    this.requestUpdate(); // ✅ Ensure UI updates when context is available
-  }
-
-  render() {
-    if (!this.appStore) {
-      return html`<p>Loading...</p>`;
-    }
-
-    return html`
-      <nav>
-        <button @click=${() => this.appStore.goToPage('/')}>Home</button>
-        <button @click=${() => this.appStore.goToPage('/profile/123')}>Profile</button>
-        <button @click=${() => this.appStore.goToPage('/cart')}>Cart</button>
-      </nav>
-    `;
-  }
-}
-
-customElements.define('navbar', Navbar);
-
