@@ -1,0 +1,45 @@
+import { createContext, ContextProvider, ContextConsumer } from '@lit/context';
+
+export const appContext = createContext('app-context');
+
+export class AppContextProvider {
+  constructor() {
+    this.state = {
+      user: null,
+      cart: [],
+      currentPage: 'home',
+    };
+
+    // ✅ Bind methods so they can be used in consumers
+    this.goToPage = this.goToPage.bind(this);
+    this.login = this.login.bind(this);
+    this.logout = this.logout.bind(this);
+    this.addToCart = this.addToCart.bind(this);
+    this.removeFromCart = this.removeFromCart.bind(this);
+  }
+
+  updateState(key, value) {
+    this.state = { ...this.state, [key]: value };
+  }
+
+  login(user) {
+    this.updateState('user', user);
+  }
+
+  logout() {
+    this.updateState('user', null);
+  }
+
+  addToCart(item) {
+    this.updateState('cart', [...this.state.cart, item]);
+  }
+
+  removeFromCart(id) {
+    this.updateState('cart', this.state.cart.filter((item) => item.id !== id));
+  }
+
+  goToPage(page) {
+    this.updateState('currentPage', page);
+    window.history.pushState({}, '', page); // Simulate navigation
+  }
+}
