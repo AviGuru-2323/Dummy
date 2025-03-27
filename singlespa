@@ -1,0 +1,21 @@
+import * as singleSpa from "single-spa";
+
+const showWhenAppNotMountedDynamic = (appName, routes) => {
+  return (location) => {
+    let isAppMounted = singleSpa.getAppStatus(appName) === "MOUNTED";
+
+    // Listen for app changes
+    singleSpa.addErrorHandler(() => {
+      isAppMounted = singleSpa.getAppStatus(appName) === "MOUNTED";
+    });
+
+    return !isAppMounted && routes.some((route) => location.pathname.startsWith(route));
+  };
+};
+
+// Show only if "@myorg/dashboard" is NOT mounted
+registerApplication({
+  name: "@myorg/help-center",
+  app: () => System.import("@myorg/help-center"),
+  activeWhen: showWhenAppNotMounted("@myorg/dashboard", ["/help", "/support"]),
+});
