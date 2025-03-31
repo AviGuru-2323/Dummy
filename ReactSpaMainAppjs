@@ -1,0 +1,69 @@
+import React, { createContext, useContext, useState } from "react";
+
+const HeaderContext = createContext();
+
+export function HeaderProvider({ children }) {
+  const [showHeader, setShowHeader] = useState(false);
+
+  return (
+    <HeaderContext.Provider value={{ showHeader, setShowHeader }}>
+      {children}
+    </HeaderContext.Provider>
+  );
+}
+
+export function useHeader() {
+  return useContext(HeaderContext);
+}
+
+
+
+import React from "react";
+import { BrowserRouter as Router, Routes, Route, Outlet } from "react-router-dom";
+import ToastContainer from "rsuite/esm/toaster/ToastContainer";
+
+import { HeaderProvider, useHeader } from "./context/HeaderContext"; 
+import Navigationbar from "./components/Navbar/Navigationbar"; 
+import Dashboard from "./pages/dashboard/dashboard"; 
+import Login from "./pages/login/Login"; 
+import AccessDenied from "./pages/login/AccessDenied";
+import LogoutResponse from "./pages/login/LogoutResponse";
+
+function BasicLayout() {
+  return (
+    <>
+      <ToastContainer />
+      <Outlet />
+    </>
+  );
+}
+
+function AppContent() {
+  const { showHeader } = useHeader(); 
+
+  return (
+    <>
+      {showHeader && <Navigationbar />} {/* Show header only if true */}
+      <Routes>
+        <Route path="/auth" element={<Login />} />
+        <Route path="/accessDenied" element={<AccessDenied />} />
+        <Route path="/logout" element={<LogoutResponse />} />
+        
+        {/* Wrap dashboard inside BasicLayout */}
+        <Route element={<BasicLayout />}>
+          <Route path="/dashboard" element={<Dashboard />} />
+        </Route>
+      </Routes>
+    </>
+  );
+}
+
+export default function App() {
+  return (
+    <HeaderProvider>
+      <Router>
+        <AppContent />
+      </Router>
+    </HeaderProvider>
+  );
+}
