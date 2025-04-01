@@ -5,47 +5,45 @@ import React, { Component } from "react";
 import { mount, unmount } from "single-spa"; // Import Single-SPA functions
 import Navigationbar from "../components/Navbar/Navigationbar";
 
-class Dashboard extends Component {
-  constructor(props) {
-    super(props);
-    this.state = {
-      activeApp: null,
-    };
-  }
+import React, { useState } from "react";
+import { mount, unmount } from "single-spa";
+import Navigationbar from "../components/Navbar/Navigationbar";
 
-  loadMicroFrontend = (appName) => {
-    const { activeApp } = this.state;
+export default function Dashboard() {
+  const [activeApp, setActiveApp] = useState(null);
 
+  const loadMicroFrontend = (appName) => {
     if (activeApp) {
       unmount(activeApp).then(() => {
-        this.setState({ activeApp: appName }, () => {
-          mount(appName);
-        });
-      });
-    } else {
-      this.setState({ activeApp: appName }, () => {
+        setActiveApp(appName);
         mount(appName);
       });
+    } else {
+      setActiveApp(appName);
+      mount(appName);
     }
   };
 
-  render() {
-    return (
-      <div>
-        <Navigationbar />
+  return (
+    <div>
+      <Navigationbar />
 
-        <h2>Dashboard</h2>
+      {/* Show dashboard content only if no micro frontend is active */}
+      {!activeApp && (
+        <div id="dashboard-contents">
+          <h2>Dashboard</h2>
+          <button onClick={() => loadMicroFrontend("@dsp/dsr-ui")}>
+            Load DSR UI
+          </button>
+        </div>
+      )}
 
-        <button onClick={() => this.loadMicroFrontend("@dsp/dsr-ui")}>
-          Load DSR UI
-        </button>
-
-        {/* Micro frontend will load inside this div */}
-        <div id="micro-frontend-container"></div>
-      </div>
-    );
-  }
+      {/* Micro frontend will load inside this div */}
+      <div id="micro-frontend-container"></div>
+    </div>
+  );
 }
+
 
 export default Dashboard;
 
