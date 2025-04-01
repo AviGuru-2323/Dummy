@@ -82,6 +82,40 @@ export default function Dashboard() {
 }
 
 
+import * as singleSpa from "single-spa";
+
+singleSpa.registerApplication({
+  name: "@dsp/dsr-ui",
+  app: async () => {
+    const app = await System.import("@dsp/dsr-ui");
+
+    return {
+      bootstrap: app.bootstrap,
+      mount: async (props) => {
+        await app.mount(props);
+
+        // Ensure the micro frontend container exists
+        const container = document.getElementById("micro-frontend-container");
+        if (container) {
+          container.innerHTML = ""; // Clear before adding new content
+          container.appendChild(props.domElement);
+        }
+      },
+      unmount: async (props) => {
+        await app.unmount(props);
+
+        // Clear micro frontend container after unmount
+        const container = document.getElementById("micro-frontend-container");
+        if (container) {
+          container.innerHTML = "";
+        }
+      },
+    };
+  },
+  activeWhen: () => false, // Prevent auto-mount; load manually
+});
+
+
 
 Updated root-config.js
 
