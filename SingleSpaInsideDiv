@@ -1,0 +1,81 @@
+You need to manually mount @dsp/dsr-ui inside a div when clicking a menu item.
+
+import React, { useState } from "react";
+import { mount, unmount } from "single-spa";
+import Navigationbar from "../../components/Navbar/Navigationbar"; 
+
+export default function Dashboard() {
+  const [activeApp, setActiveApp] = useState(null);
+
+  const loadMicroFrontend = (appName) => {
+    if (activeApp) {
+      unmount(activeApp); // Unmount previous app before mounting new one
+    }
+    setActiveApp(appName);
+    mount(appName);
+  };
+
+  return (
+    <div>
+      <Navigationbar />
+
+      <h2>Dashboard</h2>
+
+      <button onClick={() => loadMicroFrontend("@dsp/dsr-ui")}>Load DSR UI</button>
+
+      {/* Micro frontend will load inside this div */}
+      <div id="micro-frontend-container"></div>
+    </div>
+  );
+}
+
+
+
+Updated root-config.js
+
+import * as singleSpa from "single-spa";
+
+singleSpa.registerApplication(
+  "@dsp/root-component",
+  () => System.import("@dsp/root-component"),
+  (location) => location.pathname === "/"
+);
+
+singleSpa.registerApplication(
+  "@dsp/dsr-ui",
+  async () => {
+    const app = await System.import("@dsp/dsr-ui");
+
+    return {
+      bootstrap: app.bootstrap,
+      mount: async (props) => {
+        await app.mount(props);
+        document.getElementById("micro-frontend-container").appendChild(props.domElement);
+      },
+      unmount: async (props) => {
+        await app.unmount(props);
+        document.getElementById("micro-frontend-container").innerHTML = ""; // Clear container on unmount
+      }
+    };
+  },
+  () => false // Initially, don't auto-mount
+);
+
+singleSpa.start();
+
+
+@dsp/dsr-ui/root.component.js
+
+import React from "react";
+import ReactDOM from "react-dom";
+import singleSpaReact from "single-spa-react";
+import DsrApp from "./DsrApp";
+
+const reactLifecycles = singleSpaReact({
+  React,
+  ReactDOM,
+  rootComponent: DsrApp,
+  domElementGetter: () => document.getElementById("micro-frontend-container"), // Mount inside Dashboard.js div
+});
+
+export const { bootstrap, mount, unmount } = reactLifecycles;
