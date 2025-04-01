@@ -1,0 +1,198 @@
+src/
+ ├── components/
+ │    ├── Navbar/
+ │    │     ├── Navigationbar.js   <-- ✅ Always visible in Dashboard
+ │    ├── Button/
+ │          ├── Button.js
+ │
+ ├── pages/
+ │    ├── login/
+ │    │     ├── Login.js
+ │    │     ├── AccessDenied.js
+ │    │     ├── Logout.js
+ │    ├── dashboard/
+ │          ├── Dashboard.js       <-- ✅ Loads DSR UI inside div
+ │
+ ├── App.js
+ ├── root-config.js
+ ├── root.component.js
+ ├── index.ejs
+ ├── serviceWorker.js
+
+
+
+Main App.js
+
+import React from "react";
+import { BrowserRouter as Router, Routes, Route, Outlet } from "react-router-dom";
+import ToastContainer from "rsuite/esm/toaster/ToastContainer";
+
+import Navigationbar from "./components/Navbar/Navigationbar"; 
+import Dashboard from "./pages/dashboard/Dashboard"; 
+import Login from "./pages/login/Login"; 
+import AccessDenied from "./pages/login/AccessDenied";
+import LogoutResponse from "./pages/login/LogoutResponse";
+
+function BasicLayout() {
+  return (
+    <>
+      <ToastContainer />
+      <Outlet />
+    </>
+  );
+}
+
+function AppContent() {
+  return (
+    <>
+      <Navigationbar /> {/* ✅ Always visible */}
+      <Routes>
+        <Route path="/auth" element={<Login />} />
+        <Route path="/accessDenied" element={<AccessDenied />} />
+        <Route path="/logout" element={<LogoutResponse />} />
+
+        {/* Dashboard (Wrap inside BasicLayout) */}
+        <Route element={<BasicLayout />}>
+          <Route path="/dashboard" element={<Dashboard />} />
+        </Route>
+
+        {/* Catch-all route for microfrontends */}
+        <Route path="/dsr-ui/*" element={<Dashboard />} />
+      </Routes>
+    </>
+  );
+}
+
+export default function App() {
+  return (
+    <Router>
+      <AppContent />
+    </Router>
+  );
+}
+
+
+
+Dashboard.js
+import React, { Component } from "react";
+import { Link } from "react-router-dom";
+import Navigationbar from "../../components/Navbar/Navigationbar";
+import System from "systemjs";
+
+class Dashboard extends Component {
+  constructor(props) {
+    super(props);
+    this.state = {
+      currentApp: null,
+    };
+  }
+
+  componentDidMount() {
+    window.addEventListener("popstate", this.syncRouteWithMicroFrontend);
+
+    // Load DSR UI if already on /dsr-ui route
+    if (window.location.pathname.startsWith("/dsr-ui")) {
+      this.loadMicroFrontend();
+    }
+  }
+
+  componentWillUnmount() {
+    window.removeEventListener("popstate", this.syncRouteWithMicroFrontend);
+  }
+
+  syncRouteWithMicroFrontend = () => {
+    if (this.state.currentApp && this.state.currentApp.navigateTo) {
+      this.state.currentApp.navigateTo(window.location.pathname);
+    }
+  };
+
+  loadMicroFrontend = async () => {
+    const container = document.getElementById("micro-frontend-container");
+
+    if (this.state.currentApp) {
+      try {
+        await this.state.currentApp.unmount();
+        this.setState({ currentApp: null });
+      } catch (error) {
+        console.error("Error unmounting microfrontend:", error);
+      }
+    }
+
+    try {
+      const app = await System.import("@dsp/dsr-ui");
+
+      if (!app || !app.mount || !app.unmount) {
+        console.error("Invalid microfrontend module:", app);
+        return;
+      }
+
+      window.history.pushState({}, "", "/dsr-ui");
+
+      await app.mount({
+        domElement: container,
+        route: window.location.pathname,
+      });
+
+      this.setState({ currentApp: app });
+
+    } catch (error) {
+      console.error("Error loading microfrontend:", error);
+    }
+  };
+
+  render() {
+    return (
+      <div>
+        <Navigationbar />  {/* ✅ Always visible */}
+
+        <h2>Dashboard</h2>
+        <nav>
+          <Link to="/dashboard">Dashboard</Link> |{" "}
+          <button onClick={this.loadMicroFrontend}>Load DSR UI</button>
+        </nav>
+
+        {/* ✅ DSR UI loads inside this div */}
+        <div id="micro-frontend-container"></div>
+      </div>
+    );
+  }
+}
+
+export default Dashboard;
+
+
+
+import * as singleSpa from "single-spa";
+
+singleSpa.registerApplication(
+  "@dsp/root-component",
+  () => System.import("@dsp/root-component"),
+  (location) => location.pathname.startsWith("/")
+);
+
+singleSpa.registerApplication(
+  "@dsp/dsr-ui",
+  () => System.import("@dsp/dsr-ui"),
+  (location) => location.pathname.startsWith("/dsr-ui")
+);
+
+singleSpa.start();
+
+
+
+
+import React from "react";
+import ReactDOM from "react-dom";
+import singleSpaReact from "single-spa-react";
+import DsrApp from "./DsrApp";
+
+const reactLifecycles = singleSpaReact({
+  React,
+  ReactDOM,
+  rootComponent: DsrApp,
+  domElementGetter: () => document.getElementById("micro-frontend-container"),
+});
+
+export const { bootstrap, mount, unmount } = reactLifecycles;
+
+
