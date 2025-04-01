@@ -164,4 +164,44 @@ const reactLifecycles = singleSpaReact({
   domElementGetter: () => document.getElementById("micro-frontend-container"), // Mount inside Dashboard.js div
 });
 
+
+import * as singleSpa from "single-spa";
+
+singleSpa.registerApplication({
+  name: "@dsp/dsr-ui",
+  app: async () => {
+    const app = await System.import("@dsp/dsr-ui");
+
+    if (!app || !app.mount || !app.unmount) {
+      console.error("Invalid micro frontend module: missing lifecycle methods");
+      return {
+        bootstrap: () => Promise.resolve(),
+        mount: () => Promise.reject(new Error("Mount function not found")),
+        unmount: () => Promise.resolve(),
+      };
+    }
+
+    return {
+      bootstrap: app.bootstrap,
+      mount: async (props) => {
+        await app.mount(props);
+        const container = document.getElementById("micro-frontend-container");
+        if (container) {
+          container.innerHTML = "";
+          container.appendChild(props.domElement);
+        }
+      },
+      unmount: async (props) => {
+        await app.unmount(props);
+        const container = document.getElementById("micro-frontend-container");
+        if (container) {
+          container.innerHTML = "";
+        }
+      },
+    };
+  },
+  activeWhen: () => false, // Prevent auto-mount; load manually
+});
+
+
 export const { bootstrap, mount, unmount } = reactLifecycles;
