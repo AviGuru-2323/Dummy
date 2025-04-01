@@ -2,48 +2,52 @@ You need to manually mount @dsp/dsr-ui inside a div when clicking a menu item.
 
 
 import React, { Component } from "react";
-import { mount, unmount } from "single-spa"; // Import Single-SPA functions
-import Navigationbar from "../components/Navbar/Navigationbar";
-
-import React, { useState } from "react";
 import { mount, unmount } from "single-spa";
 import Navigationbar from "../components/Navbar/Navigationbar";
 
-export default function Dashboard() {
-  const [activeApp, setActiveApp] = useState(null);
+class Dashboard extends Component {
+  constructor(props) {
+    super(props);
+    this.state = {
+      activeApp: null, // Track the active micro frontend
+    };
+  }
 
-  const loadMicroFrontend = (appName) => {
-    if (activeApp) {
-      unmount(activeApp).then(() => {
-        setActiveApp(appName);
-        mount(appName);
+  loadMicroFrontend = (appName) => {
+    if (this.state.activeApp) {
+      unmount(this.state.activeApp).then(() => {
+        this.setState({ activeApp: appName }, () => mount(appName));
       });
     } else {
-      setActiveApp(appName);
-      mount(appName);
+      this.setState({ activeApp: appName }, () => mount(appName));
     }
   };
 
-  return (
-    <div>
-      <Navigationbar />
+  render() {
+    const { activeApp } = this.state;
 
-      {/* Show dashboard content only if no micro frontend is active */}
-      {!activeApp && (
-        <div id="dashboard-contents">
-          <h2>Dashboard</h2>
-          <button onClick={() => loadMicroFrontend("@dsp/dsr-ui")}>
-            Load DSR UI
-          </button>
-        </div>
-      )}
+    return (
+      <div>
+        <Navigationbar />
 
-      {/* Micro frontend will load inside this div */}
-      <div id="micro-frontend-container"></div>
-    </div>
-  );
+        {/* Show dashboard content only if no micro frontend is active */}
+        {!activeApp && (
+          <div id="dashboard-contents">
+            <h2>Dashboard</h2>
+            <button onClick={() => this.loadMicroFrontend("@dsp/dsr-ui")}>
+              Load DSR UI
+            </button>
+          </div>
+        )}
+
+        {/* Micro frontend will load inside this div */}
+        <div id="micro-frontend-container"></div>
+      </div>
+    );
+  }
 }
 
+export default Dashboard;
 
 export default Dashboard;
 
