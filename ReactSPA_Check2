@@ -1,0 +1,124 @@
+import React from "react";
+import ReactDOM from "react-dom";
+import singleSpaReact from "single-spa-react";
+import DsrApp from "./DsrApp";
+
+const reactLifecycles = singleSpaReact({
+  React,
+  ReactDOM,
+  rootComponent: DsrApp,
+  domElementGetter: (props) => {
+    // This makes sure we get the container from the props passed when calling mount
+    const container = props.domElement || document.getElementById("micro-frontend-container");
+    if (!container) {
+      throw new Error("Unable to find DOM container");
+    }
+    return container;
+  },
+});
+
+export const { bootstrap, mount, unmount } = reactLifecycles;
+
+
+
+import * as singleSpa from 'single-spa';
+
+singleSpa.registerApplication(
+  '@dsp/dsr-ui',
+  async () => {
+    console.log("🔹 Trying to load @dsp/dsr-ui...");
+
+    try {
+      const app = await System.import("@dsp/dsr-ui"); 
+      console.log("✅ Successfully imported @dsp/dsr-ui:", app);
+
+      if (!app || !app.mount || !app.unmount) {
+        console.error("❌ Invalid micro frontend module:", app);
+        return {
+          bootstrap: () => Promise.resolve(),
+          mount: () => Promise.reject(new Error("Mount function not found")),
+          unmount: () => Promise.resolve(),
+        };
+      }
+
+      return {
+        bootstrap: app.bootstrap,
+        mount: async (props) => {
+          console.log("🔹 Mounting DSR UI...");
+
+          // Ensure we pass props.domElement to the mount function
+          await app.mount(props);  // Mount with the props provided by single-spa
+
+          const container = props.domElement;
+          if (container) {
+            container.innerHTML = "";  // Ensure we clear any previous content in the container
+            container.appendChild(document.createElement("div"));  // Create a new element to append the app
+          }
+        },
+        unmount: async (props) => {
+          console.log("🔹 Unmounting DSR UI...");
+          await app.unmount(props);
+          const container = props.domElement;
+          if (container) {
+            container.innerHTML = "";  // Clean up the container when unmounting
+          }
+        }
+      };
+    } catch (error) {
+      console.error("❌ Error loading @dsp/dsr-ui:", error);
+      return {};
+    }
+  },
+  location => location.pathname.startsWith("/dsr"),  // Activate when path starts with /dsr
+);
+
+singleSpa.start();
+
+
+
+
+
+import React, { Component } from "react";
+import { mount, unmount } from "single-spa";  // Import single-spa mount/unmount methods
+
+class Dashboard extends Component {
+  constructor(props) {
+    super(props);
+    this.state = {
+      activeApp: null,
+    };
+  }
+
+  loadMicroFrontend = async () => {
+    const appName = "@dsp/dsr-ui";
+
+    // Unmount the previous app, if any
+    if (this.state.activeApp) {
+      await unmount(this.state.activeApp);
+    }
+
+    try {
+      // Dynamically mount the microfrontend using the DOM element
+      await mount(appName, {
+        domElement: document.getElementById("micro-frontend-container"),  // Pass the container where the app will be mounted
+      });
+
+      this.setState({ activeApp: appName });
+    } catch (error) {
+      console.error("Error loading micro frontend:", error);
+    }
+  };
+
+  render() {
+    return (
+      <div>
+        <button onClick={this.loadMicroFrontend}>Load DSR UI</button>
+        <div id="micro-frontend-container"></div>  {/* This div will hold the loaded app */}
+      </div>
+    );
+  }
+}
+
+export default Dashboard;
+
+
