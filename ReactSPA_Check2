@@ -122,3 +122,65 @@ class Dashboard extends Component {
 export default Dashboard;
 
 
+
+import React, { Component } from "react";
+
+class Dashboard extends Component {
+  constructor(props) {
+    super(props);
+    this.state = {
+      activeApp: null,
+      currentAppInstance: null,  // Store the instance of the current app
+    };
+  }
+
+  loadMicroFrontend = async () => {
+    const appName = "@dsp/dsr-ui";
+    const container = document.getElementById("micro-frontend-container");
+
+    // Unmount the previous app, if any
+    if (this.state.currentAppInstance) {
+      try {
+        await this.state.currentAppInstance.unmount();  // Unmount the currently loaded app
+        this.setState({ currentAppInstance: null });  // Clear the reference
+      } catch (error) {
+        console.error("Error during unmounting:", error);
+      }
+    }
+
+    try {
+      // Dynamically import the microfrontend only when needed
+      const app = await System.import(appName);
+
+      if (!app || !app.mount || !app.unmount) {
+        console.error("❌ Invalid micro frontend module:", app);
+        return;
+      }
+
+      // Mount the app
+      await app.mount({
+        domElement: container,  // Pass the container where the app will be mounted
+      });
+
+      // Save the current app instance for unmounting
+      this.setState({ currentAppInstance: app });
+
+    } catch (error) {
+      console.error("Error loading micro frontend:", error);
+    }
+  };
+
+  render() {
+    return (
+      <div>
+        <button onClick={this.loadMicroFrontend}>Load DSR UI</button>
+        <div id="micro-frontend-container"></div>  {/* This div will hold the loaded app */}
+      </div>
+    );
+  }
+}
+
+export default Dashboard;
+
+
+
