@@ -1,5 +1,55 @@
 You need to manually mount @dsp/dsr-ui inside a div when clicking a menu item.
 
+
+import React, { Component } from "react";
+import { mount, unmount } from "single-spa"; // Import Single-SPA functions
+import Navigationbar from "../components/Navbar/Navigationbar";
+
+class Dashboard extends Component {
+  constructor(props) {
+    super(props);
+    this.state = {
+      activeApp: null,
+    };
+  }
+
+  loadMicroFrontend = (appName) => {
+    const { activeApp } = this.state;
+
+    if (activeApp) {
+      unmount(activeApp).then(() => {
+        this.setState({ activeApp: appName }, () => {
+          mount(appName);
+        });
+      });
+    } else {
+      this.setState({ activeApp: appName }, () => {
+        mount(appName);
+      });
+    }
+  };
+
+  render() {
+    return (
+      <div>
+        <Navigationbar />
+
+        <h2>Dashboard</h2>
+
+        <button onClick={() => this.loadMicroFrontend("@dsp/dsr-ui")}>
+          Load DSR UI
+        </button>
+
+        {/* Micro frontend will load inside this div */}
+        <div id="micro-frontend-container"></div>
+      </div>
+    );
+  }
+}
+
+export default Dashboard;
+
+
 import React, { useState } from "react";
 import { mount, unmount } from "single-spa";
 import Navigationbar from "../../components/Navbar/Navigationbar"; 
