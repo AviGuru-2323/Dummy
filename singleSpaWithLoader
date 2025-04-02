@@ -1,0 +1,107 @@
+import React, { Component } from "react";
+import { Link } from "react-router-dom";
+import { Loader } from "rsuite"; // ✅ Import RSuite Loader
+import Navigationbar from "../../components/Navbar/Navigationbar";
+import System from "systemjs";
+
+class Dashboard extends Component {
+  constructor(props) {
+    super(props);
+    this.state = {
+      currentApp: null,
+      loading: false, // ✅ Add loading state
+    };
+  }
+
+  componentDidMount() {
+    window.addEventListener("popstate", this.syncRouteWithMicroFrontend);
+
+    // Load DSR UI if already on /dsr-ui route
+    if (window.location.pathname.startsWith("/dsr-ui")) {
+      this.loadMicroFrontend();
+    }
+  }
+
+  componentWillUnmount() {
+    window.removeEventListener("popstate", this.syncRouteWithMicroFrontend);
+  }
+
+  syncRouteWithMicroFrontend = () => {
+    if (this.state.currentApp && this.state.currentApp.navigateTo) {
+      this.state.currentApp.navigateTo(window.location.pathname);
+    }
+  };
+
+  loadMicroFrontend = async () => {
+    const container = document.getElementById("micro-frontend-container");
+
+    if (!container) {
+      console.error("Microfrontend container not found.");
+      return;
+    }
+
+    // ✅ Show loader before loading
+    this.setState({ loading: true });
+
+    // Unmount the current app safely
+    if (this.state.currentApp && typeof this.state.currentApp.unmount === "function") {
+      try {
+        await this.state.currentApp.unmount();
+      } catch (error) {
+        console.warn("Error unmounting microfrontend:", error);
+      }
+      this.setState({ currentApp: null });
+    }
+
+    try {
+      const app = await System.import("@dsp/dsr-ui");
+
+      if (!app || typeof app.mount !== "function" || typeof app.unmount !== "function") {
+        console.error("Invalid microfrontend module:", app);
+        return;
+      }
+
+      await app.mount({
+        domElement: container,
+        route: window.location.pathname,
+      });
+
+      this.setState({ currentApp: app, loading: false }); // ✅ Hide loader when loaded
+
+    } catch (error) {
+      console.error("Error loading microfrontend:", error);
+      this.setState({ loading: false }); // ✅ Hide loader on error
+    }
+  };
+
+  render() {
+    return (
+      <div>
+        <Navigationbar /> {/* ✅ Always visible */}
+
+        {/* ✅ Show Loader if loading */}
+        {this.state.loading && (
+          <div style={{ textAlign: "center", marginTop: "20px" }}>
+            <Loader size="lg" content="Loading DSR UI..." />
+          </div>
+        )}
+
+        {/* ✅ Show Dashboard UI only when not loading */}
+        {!this.state.currentApp && !this.state.loading && (
+          <>
+            <h2>Dashboard</h2>
+            <nav>
+              <Link to="/dashboard">Dashboard</Link> |{" "}
+              <button onClick={this.loadMicroFrontend}>Load DSR UI</button>
+            </nav>
+          </>
+        )}
+
+        {/* ✅ DSR UI loads inside this div */}
+        <div id="micro-frontend-container"></div>
+      </div>
+    );
+  }
+}
+
+export default Dashboard;
