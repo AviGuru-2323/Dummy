@@ -205,3 +205,66 @@ singleSpa.registerApplication({
 
 
 export const { bootstrap, mount, unmount } = reactLifecycles;
+
+
+
+loadMicroFrontend = async () => {
+  const container = document.getElementById("micro-frontend-container");
+
+  if (!container) {
+    console.error("Micro frontend container not found.");
+    return;
+  }
+
+  // Unmount the current app safely
+  if (this.state.currentApp && typeof this.state.currentApp.unmount === "function") {
+    try {
+      await this.state.currentApp.unmount();
+    } catch (error) {
+      console.warn("Error unmounting microfrontend:", error);
+    }
+    this.setState({ currentApp: null });
+  }
+
+  try {
+    const app = await System.import("@dsp/dsr-ui");
+
+    if (!app || typeof app.mount !== "function" || typeof app.unmount !== "function") {
+      console.error("Invalid microfrontend module:", app);
+      return;
+    }
+
+    await app.mount({
+      domElement: container,
+      route: window.location.pathname,
+    });
+
+    this.setState({ currentApp: app });
+  } catch (error) {
+    console.error("Error loading microfrontend:", error);
+  }
+};
+
+
+
+
+const container = document.getElementById("micro-frontend-container");
+if (!container) {
+  console.error("Microfrontend container not found, skipping mount/unmount.");
+  return;
+}
+
+
+
+componentWillUnmount() {
+  window.removeEventListener("popstate", this.syncRouteWithMicroFrontend);
+
+  if (this.state.currentApp && typeof this.state.currentApp.unmount === "function") {
+    this.state.currentApp.unmount().catch((error) => {
+      console.warn("Error unmounting microfrontend on componentWillUnmount:", error);
+    });
+  }
+}
+
+
+
