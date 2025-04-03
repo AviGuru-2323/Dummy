@@ -1,0 +1,163 @@
+import React, { useState } from "react";
+import { Input, InputGroup, IconButton, Carousel, Card, Grid, Row, Col } from "rsuite";
+import { Search, ArrowRight } from "@rsuite/icons";
+import "rsuite/dist/rsuite.min.css"; // Import RSuite styles
+import "./DashboardPage.css"; // Import custom CSS
+
+const DashboardPage = () => {
+  const [searchQuery, setSearchQuery] = useState("");
+  const cards = [
+    { id: 1, title: "Card 1", description: "Description for card 1" },
+    { id: 2, title: "Card 2", description: "Description for card 2" },
+    { id: 3, title: "Card 3", description: "Description for card 3" },
+    { id: 4, title: "Card 4", description: "Description for card 4" },
+  ];
+
+  const filteredCards = cards.filter((card) =>
+    card.title.toLowerCase().includes(searchQuery.toLowerCase())
+  );
+
+  return (
+    <div className="dashboard-container">
+      {/* Header */}
+      <header className="dashboard-header">Dashboard Header</header>
+
+      {/* Blue Section with Carousel */}
+      <div className="blue-section">
+        <Carousel autoplay className="carousel">
+          <div className="carousel-item">Slide 1</div>
+          <div className="carousel-item">Slide 2</div>
+          <div className="carousel-item">Slide 3</div>
+        </Carousel>
+      </div>
+
+      {/* Search Bar */}
+      <div className="search-bar">
+        <InputGroup inside>
+          <Input placeholder="Search cards..." onChange={(value) => setSearchQuery(value)} />
+          <InputGroup.Button>
+            <Search />
+          </InputGroup.Button>
+        </InputGroup>
+      </div>
+
+      {/* Cards Section */}
+      <Grid className="cards-section">
+        <Row gutter={16}>
+          {filteredCards.map((card) => (
+            <Col xs={24} sm={12} md={6} key={card.id}>
+              <Card className="clickable-card">
+                <h4>{card.title}</h4>
+                <p>{card.description}</p>
+                <IconButton icon={<ArrowRight />} appearance="primary">
+                  View More
+                </IconButton>
+              </Card>
+            </Col>
+          ))}
+        </Row>
+      </Grid>
+
+      {/* Footer */}
+      <footer className="dashboard-footer">Dashboard Footer</footer>
+    </div>
+  );
+};
+
+export default DashboardPage;
+
+
+
+
+/* General Styling */
+.dashboard-container {
+  display: flex;
+  flex-direction: column;
+  min-height: 100vh;
+  font-family: Arial, sans-serif;
+}
+
+/* Header */
+.dashboard-header {
+  background: #333;
+  color: white;
+  text-align: center;
+  padding: 15px;
+  font-size: 20px;
+}
+
+/* Blue Section */
+.blue-section {
+  background: #007bff;
+  height: 30vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* Carousel */
+.carousel {
+  width: 80%;
+  max-width: 600px;
+}
+
+.carousel-item {
+  height: 150px;
+  background: white;
+  color: black;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 18px;
+  border-radius: 8px;
+}
+
+/* Search Bar */
+.search-bar {
+  display: flex;
+  justify-content: center;
+  padding: 15px;
+  background: #f4f4f4;
+}
+
+/* Cards Section */
+.cards-section {
+  padding: 20px;
+  display: flex;
+  justify-content: center;
+}
+
+/* Clickable Cards */
+.clickable-card {
+  padding: 20px;
+  text-align: center;
+  background: white;
+  border-radius: 10px;
+  box-shadow: 0px 4px 8px rgba(0, 0, 0, 0.1);
+  cursor: pointer;
+  transition: transform 0.2s ease-in-out;
+}
+
+.clickable-card:hover {
+  transform: scale(1.05);
+}
+
+/* Footer */
+.dashboard-footer {
+  background: #333;
+  color: white;
+  text-align: center;
+  padding: 15px;
+  margin-top: auto;
+}
+
+/* Responsive Design */
+@media (max-width: 768px) {
+  .blue-section {
+    height: 25vh;
+  }
+
+  .clickable-card {
+    margin-bottom: 15px;
+  }
+}
