@@ -242,3 +242,190 @@ const DashboardPage = () => {
 
 export default DashboardPage;
 
+
+
+import { LitElement, html, css } from 'lit';
+
+export class DashboardPage extends LitElement {
+  static styles = css`
+    :host {
+      display: block;
+      font-family: Arial, sans-serif;
+    }
+
+    .dashboard-container {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      text-align: center;
+    }
+
+    .dashboard-header, .dashboard-footer {
+      width: 100%;
+      background: #333;
+      color: white;
+      padding: 15px;
+      font-size: 18px;
+    }
+
+    .blue-section {
+      width: 100%;
+      height: 30vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: background-color 0.5s ease-in-out;
+    }
+
+    .carousel-container {
+      width: 80%;
+      max-width: 600px;
+    }
+
+    .carousel-item {
+      height: 150px;
+      background: white;
+      color: black;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 18px;
+      border-radius: 8px;
+      transition: background-color 0.5s ease-in-out;
+      box-shadow: 0px 4px 6px rgba(0, 0, 0, 0.1);
+    }
+
+    .search-bar {
+      margin: 20px;
+      display: flex;
+      justify-content: center;
+      gap: 10px;
+    }
+
+    input {
+      padding: 10px;
+      font-size: 16px;
+      border: 1px solid #ddd;
+      border-radius: 5px;
+      width: 200px;
+    }
+
+    button {
+      padding: 10px 15px;
+      font-size: 16px;
+      border: none;
+      background: #007bff;
+      color: white;
+      cursor: pointer;
+      border-radius: 5px;
+      transition: background 0.3s;
+    }
+
+    button:hover {
+      background: #0056b3;
+    }
+
+    .cards-container {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+      gap: 15px;
+      padding: 20px;
+      max-width: 800px;
+    }
+
+    .card {
+      background: #fff;
+      border-radius: 10px;
+      padding: 15px;
+      box-shadow: 0px 4px 6px rgba(0, 0, 0, 0.1);
+      transition: transform 0.2s;
+      cursor: pointer;
+      text-align: left;
+    }
+
+    .card:hover {
+      transform: scale(1.05);
+    }
+
+    .footer {
+      margin-top: 20px;
+      padding: 10px;
+      background: #333;
+      color: white;
+      text-align: center;
+      width: 100%;
+    }
+  `;
+
+  static properties = {
+    searchQuery: { type: String },
+    slideIndex: { type: Number },
+    slides: { type: Array },
+    cards: { type: Array }
+  };
+
+  constructor() {
+    super();
+    this.searchQuery = '';
+    this.slideIndex = 0;
+    this.slides = [
+      { text: 'Slide 1', color: '#ff6b6b' },
+      { text: 'Slide 2', color: '#51cf66' },
+      { text: 'Slide 3', color: '#4dabf7' }
+    ];
+    this.cards = [
+      { title: 'Card 1', description: 'Some details about card 1' },
+      { title: 'Card 2', description: 'Some details about card 2' },
+      { title: 'Card 3', description: 'Some details about card 3' },
+      { title: 'Card 4', description: 'Some details about card 4' }
+    ];
+  }
+
+  updateSlideIndex() {
+    this.slideIndex = (this.slideIndex + 1) % this.slides.length;
+    this.requestUpdate();
+  }
+
+  updateSearchQuery(event) {
+    this.searchQuery = event.target.value.toLowerCase();
+  }
+
+  render() {
+    return html`
+      <div class="dashboard-container">
+        <header class="dashboard-header">Dashboard Header</header>
+
+        <div class="blue-section" style="background-color: ${this.slides[this.slideIndex].color}">
+          <div class="carousel-container">
+            <div class="carousel-item">${this.slides[this.slideIndex].text}</div>
+          </div>
+        </div>
+
+        <button @click="${this.updateSlideIndex}">Next Slide</button>
+
+        <div class="search-bar">
+          <input type="text" placeholder="Search cards..." @input="${this.updateSearchQuery}" />
+          <button>Search</button>
+        </div>
+
+        <div class="cards-container">
+          ${this.cards
+            .filter(card => card.title.toLowerCase().includes(this.searchQuery))
+            .map(
+              card => html`
+                <div class="card">
+                  <h4>${card.title}</h4>
+                  <p>${card.description}</p>
+                  <button>View More</button>
+                </div>
+              `
+            )}
+        </div>
+
+        <footer class="dashboard-footer">Dashboard Footer</footer>
+      </div>
+    `;
+  }
+}
+
+customElements.define('dashboard-page', DashboardPage);
