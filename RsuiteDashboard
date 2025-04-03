@@ -161,3 +161,84 @@ export default DashboardPage;
     margin-bottom: 15px;
   }
 }
+
+
+
+
+
+
+import React, { useState } from "react";
+import { Input, InputGroup, IconButton, Carousel, Panel, Grid, Row, Col } from "rsuite";
+import { Search, ArrowRight } from "@rsuite/icons";
+import "rsuite/dist/rsuite.min.css"; 
+import "./DashboardPage.css"; 
+
+const DashboardPage = () => {
+  const [searchQuery, setSearchQuery] = useState("");
+  const [slideIndex, setSlideIndex] = useState(0);
+
+  const slides = [
+    { id: 1, text: "Slide 1", color: "#ff6b6b" },
+    { id: 2, text: "Slide 2", color: "#51cf66" },
+    { id: 3, text: "Slide 3", color: "#4dabf7" },
+  ];
+
+  const handleSlideChange = (index) => {
+    setSlideIndex(index);
+  };
+
+  return (
+    <div className="dashboard-container">
+      <header className="dashboard-header">Dashboard Header</header>
+
+      {/* Blue Section with Dynamic Background */}
+      <div className="blue-section" style={{ backgroundColor: slides[slideIndex].color }}>
+        <Carousel
+          autoplay
+          autoplayInterval={2000} // Changes slide every 2 seconds
+          className="carousel"
+          onSelect={handleSlideChange}
+        >
+          {slides.map((slide) => (
+            <div key={slide.id} className="carousel-item">
+              {slide.text}
+            </div>
+          ))}
+        </Carousel>
+      </div>
+
+      {/* Search Bar */}
+      <div className="search-bar">
+        <InputGroup inside>
+          <Input placeholder="Search cards..." onChange={(value) => setSearchQuery(value)} />
+          <InputGroup.Button>
+            <Search />
+          </InputGroup.Button>
+        </InputGroup>
+      </div>
+
+      {/* Cards Section */}
+      <Grid className="cards-section">
+        <Row gutter={16}>
+          {[1, 2, 3, 4].map((id) => (
+            <Col xs={24} sm={12} md={6} key={id}>
+              <Panel shaded bordered bodyFill className="clickable-card">
+                <h4>Card {id}</h4>
+                <p>Card description</p>
+                <IconButton icon={<ArrowRight />} appearance="primary">
+                  View More
+                </IconButton>
+              </Panel>
+            </Col>
+          ))}
+        </Row>
+      </Grid>
+
+      {/* Footer */}
+      <footer className="dashboard-footer">Dashboard Footer</footer>
+    </div>
+  );
+};
+
+export default DashboardPage;
+
