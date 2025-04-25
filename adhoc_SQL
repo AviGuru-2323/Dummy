@@ -1,0 +1,7 @@
+SELECT 
+    r.session_id, r.status, r.command, r.wait_type, r.start_time,
+    t.text
+FROM sys.dm_exec_requests r
+JOIN sys.dm_exec_sessions s ON r.session_id = s.session_id
+JOIN sys.dm_exec_sql_text(r.sql_handle) AS t ON 1 = 1
+WHERE s.is_user_process = 1;
