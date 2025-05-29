@@ -1,0 +1,50 @@
+In Oracle Database, the **"notable network" wait class** is not a standard, officially named wait class. However, you may be referring to **"Network"** wait class or **"Other"** wait class where network-related waits may sometimes appear, especially in performance monitoring tools like **AWR (Automatic Workload Repository)** or **ASH (Active Session History)**.
+
+### Possible Interpretations:
+
+#### 1. **Network Wait Class**
+
+Oracle has a **"Network"** wait class, and it includes waits related to communication between:
+
+* Oracle client and server
+* Oracle RAC instances
+* Oracle processes (e.g., listener, dispatcher)
+
+**Common Wait Events in this Class:**
+
+* `SQL*Net message from client` – Idle wait; client is taking time to send a request.
+* `SQL*Net message to client` – Time spent sending data back to the client.
+* `SQL*Net more data from client` – Reading additional data from client.
+* `SQL*Net more data to client` – Writing additional data to client.
+* `gc current block 2-way` – In RAC, network waits for block transfer between nodes.
+
+#### 2. **"Notable" Network Waits in Performance Tuning**
+
+If someone says "notable network wait class," they might mean:
+
+* **Network waits that are abnormally high** and **impact performance**.
+* Waits that **exceed typical baselines**, often worth investigating.
+
+These can show up in AWR reports under sections like:
+
+* **Top Timed Events**
+* **Wait Classes with High DB Time**
+
+### What to Look For:
+
+When troubleshooting network waits:
+
+* Check **latency** and **bandwidth** between database and client/RAC nodes.
+* Monitor **SQL\*Net round-trip time**.
+* Evaluate **idle time vs. active time** in client-server interactions.
+* Use tools like **AWR, ASH, and Oracle Enterprise Manager (OEM)** to drill down.
+
+### Summary
+
+If you're seeing "notable network wait class" in a report or discussion:
+
+* It's likely referring to **high-impact waits in the 'Network' wait class**.
+* Investigate **SQL\*Net waits** and **RAC-related waits**.
+* Compare against normal baselines to assess if they’re **notable**.
+
+If you can provide the context (e.g., AWR snapshot or specific wait event), I can help analyze it further.
