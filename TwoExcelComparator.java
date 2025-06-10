@@ -139,3 +139,57 @@ public class ExcelComparator {
         }
     }
 }
+
+
+// Map: SerializedColumnUpdate -> List of portfolio_ids
+Map<String, List<String>> groupedUpdates = new LinkedHashMap<>();
+Map<String, String> updateSQLMap = new LinkedHashMap<>();
+
+for (Map.Entry<String, Map<String, String>> entry : updateMap.entrySet()) {
+    String portfolioId = entry.getKey();
+    Map<String, String> changes = entry.getValue();
+
+    // Canonical key to group by column-value set
+    StringBuilder canonicalKey = new StringBuilder();
+    for (Map.Entry<String, String> e : changes.entrySet()) {
+        canonicalKey.append(e.getKey()).append("=").append(e.getValue()).append(";");
+    }
+
+    String key = canonicalKey.toString();
+    groupedUpdates.putIfAbsent(key, new ArrayList<>());
+    groupedUpdates.get(key).add(portfolioId);
+}
+
+// Now create SQL statements per grouped set
+for (Map.Entry<String, List<String>> entry : groupedUpdates.entrySet()) {
+    String columnSet = entry.getKey(); // like col1=val1;col2=val2;
+    List<String> portfolioIds = entry.getValue();
+
+    // Rebuild SET clause
+    String[] assignments = columnSet.split(";");
+    List<String> setClauses = new ArrayList<>();
+    for (String assign : assignments) {
+        if (assign.trim().isEmpty()) continue;
+        String[] parts = assign.split("=", 2);
+        String col = parts[0];
+        String val = parts[1].replace("'", "''");
+        setClauses.add(col + "='" + val + "'");
+    }
+
+    StringBuilder sql = new StringBuilder();
+    sql.append("UPDATE mst_portfolio SET ")
+       .append(String.join(", ", setClauses))
+       .append(" WHERE portfolio_id IN (");
+
+    List<String> quotedIds = new ArrayList<>();
+    for (String id : portfolioIds) {
+        quotedIds.add("'" + id + "'");
+    }
+    sql.append(String.join(", ", quotedIds)).append(");");
+
+    // Add to sheet
+    Row sqlRow = sqlSheet.createRow(sqlRowNum++);
+    sqlRow.createCell(0).setCellValue(String.join(",", portfolioIds));
+    sqlRow.createCell(1).setCellValue(sql.toString());
+}
+
