@@ -106,3 +106,15 @@ public class ExcelComparator {
         }
     }
 }
+
+
+
+String original = "PORTFOLIO_STL_DATA_STL";
+int lastIndex = original.lastIndexOf("_STL");
+
+if (lastIndex != -1) {
+    String result = original.substring(0, lastIndex) + original.substring(lastIndex + 4);
+    System.out.println("Updated String: " + result);
+} else {
+    System.out.println("No _STL found.");
+}
