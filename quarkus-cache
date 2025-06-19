@@ -1,2 +1,33 @@
 quarkus.cache.caffeine.caches.util-cache.expire-after-write=60s
 quarkus.cache.caffeine.caches.util-cache.maximum-size=1000
+
+
+import com.github.benmanes.caffeine.cache.Cache;
+import com.github.benmanes.caffeine.cache.Caffeine;
+
+import javax.annotation.PostConstruct;
+import javax.enterprise.context.ApplicationScoped;
+import java.util.concurrent.TimeUnit;
+
+@ApplicationScoped
+public class UtilityService {
+
+    private Cache<String, String> cache;
+
+    @PostConstruct
+    void init() {
+        cache = Caffeine.newBuilder()
+                .expireAfterWrite(60, TimeUnit.SECONDS)
+                .maximumSize(1000)
+                .build();
+    }
+
+    public String getCached(String key) {
+        return cache.get(key, k -> fetchFromRestClient(k));
+    }
+
+    private String fetchFromRestClient(String k) {
+        System.out.println("Fetching from REST client...");
+        return "value-" + k; // Or real client call
+    }
+}
