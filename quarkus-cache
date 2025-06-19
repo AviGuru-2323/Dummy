@@ -1,0 +1,2 @@
+quarkus.cache.caffeine.caches.util-cache.expire-after-write=60s
+quarkus.cache.caffeine.caches.util-cache.maximum-size=1000
