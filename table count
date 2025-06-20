@@ -1,0 +1,12 @@
+SELECT 
+    table_name,
+    TO_NUMBER(
+        EXTRACTVALUE(
+            XMLTYPE(
+                DBMS_XMLGEN.getXML('SELECT COUNT(*) AS count FROM "' || table_name || '"')
+            ),
+            '/ROWSET/ROW/COUNT'
+        )
+    ) AS row_count
+FROM user_tables
+ORDER BY row_count DESC;
