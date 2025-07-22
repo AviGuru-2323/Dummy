@@ -1,1 +1,12 @@
-Import-Certificate -FilePath "C:\path\to\root_cert.cer" -CertStoreLocation Cert:\LocalMachine\Root
+Hi [Name],
+
+As my last working day is nearing, I wanted to follow up regarding the retention process.
+
+I had submitted my resignation on [date you submitted resignation], and during my conversation with [previous manager’s name] at that time, he mentioned that he would initiate the retention process. I wanted to check if there has been any update on this from your end or if there are any next steps I should be aware of.
+
+Please let me know in case you need any further details from my side.
+
+Thank you for your support.
+
+Best regards,
+[Your Name]
