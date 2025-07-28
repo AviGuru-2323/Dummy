@@ -1,12 +1,10 @@
-Hi [Name],
+SSLEngine on
 
-As my last working day is nearing, I wanted to follow up regarding the retention process.
+# Disable ciphers with RSA key exchange (kRSA)
+SSLCipherSuite HIGH:!aNULL:!eNULL:!MD5:!3DES:!RC4:!DSS:!EXP:!LOW:!SEED:!IDEA:!CAMELLIA:!PSK:!SRP:!kRSA
 
-I had submitted my resignation on [date you submitted resignation], and during my conversation with [previous manager’s name] at that time, he mentioned that he would initiate the retention process. I wanted to check if there has been any update on this from your end or if there are any next steps I should be aware of.
+# Only allow TLS 1.2 and 1.3
+SSLProtocol TLSv1.2 TLSv1.3
 
-Please let me know in case you need any further details from my side.
-
-Thank you for your support.
-
-Best regards,
-[Your Name]
+# Use server's cipher preference
+SSLHonorCipherOrder on
