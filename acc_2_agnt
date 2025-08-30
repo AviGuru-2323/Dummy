@@ -1,0 +1,314 @@
+import os
+import re
+import json
+import time
+import pandas as pd
+from sqlalchemy import text
+from dotenv import load_dotenv
+from langchain_community.utilities import SQLDatabase
+from langchain_experimental.sql import SQLDatabaseChain
+from langchain_groq import ChatGroq
+from langchain.prompts import PromptTemplate
+from langchain_google_genai import ChatGoogleGenerativeAI
+from langchain_openai import ChatOpenAI
+
+from langchain_core.messages import HumanMessage, AIMessage, SystemMessage
+from langchain_core.runnables import RunnableConfig
+from langchain_core.output_parsers import StrOutputParser
+from langchain_community.vectorstores import FAISS
+from langchain_core.prompts import ChatPromptTemplate, MessagesPlaceholder
+from langchain.chains import create_sql_query_chain
+from langchain.agents import AgentExecutor
+from langchain.tools import tool
+from langchain.memory import ConversationSummaryMemory
+from langgraph.graph import StateGraph, END
+from langchain_community.utilities import SQLDatabase
+import httpx
+import logging
+from langchain_openai import ChatOpenAI
+
+from app.memory.chat_memory import ChatMemory
+from app.vectorstore.vector_store import DocumentRetriever as VectorStore
+
+class SQLChatInsight:
+
+    def __init__(self, uniqueSessionId: str, user_id: str = "", username: str = "", db_uri: str = None,
+                    model_name: str = "llama3-70b-8192"  ):        
+        self.db_uri = db_uri
+        self.model_name = model_name
+        self.uniqueSessionId = uniqueSessionId
+        self.user_id = user_id
+        self.user_name = username
+
+        # Initialize LLM
+        self.llm = ChatGroq(
+            api_key=os.getenv("GROQ_API_KEY"),
+            model=self.model_name,
+            temperature=0.0  # Using 0 temperature for SQL operations to get deterministic results
+        )        
+        
+        # Memory handler
+        self.memory = ChatMemory(
+            uniqueSessionId=uniqueSessionId, 
+            max_token_limit=2000,
+            llm=self.llm, 
+            user_id=self.user_id, 
+            username=self.user_name)
+        
+        # LLM setup
+        #self.llm = ChatGroq(
+        #    api_key=groq_api_key,
+        #    model="llama3-70b-8192",
+        #    temperature=0
+        #)
+
+        #self.llm = ChatGoogleGenerativeAI(
+        #    model="gemini-2.0-flash",
+        #    temperature=0,
+        #    max_tokens=None,
+        #    timeout=None,
+        #    max_retries=2,
+        #    # other params...
+        #)
+
+        #self.llm = ChatOpenAI(
+        #    model="gpt-4o",
+        #    temperature=0,
+        #    max_tokens=None,
+        #    timeout=None,
+        #    max_retries=2
+        #)
+
+        # Connect to DB
+        #self.db = SQLDatabase.from_uri(f"mysql+pymysql://{user}:{password}@{host}:{port}/{database}")
+        
+        self.db = SQLDatabase.from_uri(self.db_uri)
+        self.engine = self.db._engine
+
+        # SQL Chain
+        self.sql_chain = SQLDatabaseChain.from_llm(
+            llm=self.llm,
+            db=self.db,
+            verbose=True,
+            return_sql=True,
+            use_query_checker=True
+        )
+
+        # Prompt
+        self.summary_prompt = PromptTemplate.from_template(
+            """
+You are a helpful assistant summarizing SQL query results for the user.
+
+The user asked:
+{question}
+
+SQL Query:
+{clean_sql}
+
+Query Results:
+{data}
+
+Please provide your response strictly in the following JSON format and do not include any explanations outside the JSON:
+
+{{
+  "summary": "A concise and informative summary of the results, highlighting insights or patterns. Include the SQL query in the summary only if the user explicitly requested it.",
+  "visualizationApplicable": true,
+  "appropriateVisualizations": ["bar", "line"],
+  "chartResponses": [
+    {{
+      "type": "bar",
+      "title": "Sales per Month",
+      "xAxis": "Month",
+      "yAxis": "Sales",
+      "data": [
+        {{ "Month": "Jan", "Sales": 10000 }},
+        {{ "Month": "Feb", "Sales": 15000 }}
+      ]
+    }}
+  ]
+}}
+
+Guidelines:
+- If a visualization is appropriate, set "visualizationApplicable" to true and suggest suitable chart types in "appropriateVisualizations".
+- If visualization is not appropriate, set "visualizationApplicable" to false and use an empty array for "appropriateVisualizations" and "chartResponses".
+- The "chartResponses" array should contain at least one chart suggestion if visualizationApplicable is true, with fields matching the data returned.
+- Ensure the JSON is valid and parsable.
+"""
+        )
+
+    def process_question(self, question: str):
+        start = time.time()
+        # Get chat history from memory
+        history = self.memory.message_history[-10:]
+        print('111111111111111111111111111111111')
+        print(history)
+        historyContext = []
+        for item in history:
+            if isinstance(item, dict) and "user" in item and "assistant" in item:
+                print(item["user"])
+                print(item["assistant"])
+                historyContext.append(HumanMessage(content=item["user"]["content"]))
+                historyContext.append(AIMessage(content=item["assistant"]["content"]))
+                
+        chat_history = historyContext
+        print('22222222222222222222222222222222')
+        print(chat_history)
+        resolve_conference_resp = self.resolve_confernce(
+            user_input=question,
+            chat_history=chat_history
+        )
+
+        question = resolve_conference_resp["query"]
+
+        # Step 1: Get SQL from LLM
+        response = self.sql_chain.invoke(question)
+        sql_query_raw = response.get("result", "")
+        if not sql_query_raw:
+            raise ValueError("No SQL query found in response.")
+
+        sql_match = re.search(r"```sql\\s*(.*?)```", sql_query_raw, re.DOTALL | re.IGNORECASE)
+        if not sql_match:
+            sql_match = re.search(r"```(.*?)```", sql_query_raw, re.DOTALL)
+
+        if sql_match:
+            clean_sql = sql_match.group(1).strip()
+        else:
+            index = sql_query_raw.upper().find("SELECT")
+            if index != -1:
+                clean_sql = sql_query_raw[index:].strip()
+            else:
+                raise ValueError("No SQL found in the output.")
+
+        # remove ` from sql query`
+        clean_sql = clean_sql.replace("`", "")
+        # split by first select in any case and use the second part
+        clean_sql = clean_sql.split("SELECT", 1)[-1].strip() 
+        clean_sql = "SELECT " + clean_sql   
+        print("Clean SQL Query:", clean_sql)
+
+        # Step 2: Run SQL and fetch results
+        with self.engine.connect() as conn:
+            result_df = pd.read_sql(text(clean_sql), conn)
+        print("Result DataFrame:", result_df)
+        # Step 3: Generate insight and visualization suggestion
+        llm_input = result_df.to_markdown(index=False)[:5000]
+        insight = self.llm.invoke(self.summary_prompt.format(data=llm_input, question=question, clean_sql=clean_sql))
+
+        insight_content = getattr(insight, "content", insight)
+        insight_dict = json.loads(insight_content)
+        result_json = result_df.to_dict(orient="records")
+
+        final_response = {
+            "role": "assistant",
+            "content": insight_dict.get("summary", ""),
+            "summary": insight_dict.get("summary", ""),
+            "visualizationApplicable": insight_dict.get("visualizationApplicable", False),
+            "appropriateVisualizations": insight_dict.get("appropriateVisualizations", []),
+            "chartResponses": insight_dict.get("chartResponses", []),
+            "query": clean_sql,
+            "results": result_json,
+            "timeTaken": time.time() - start
+        }
+
+        self.memory.add_user_ai_exchange({"role" : "user", "content": question}, final_response)
+        return final_response
+        
+    def resolve_confernce(self, user_input, chat_history) -> dict:
+        """Parse user input, resolve coreference with LLM, update message and store original input."""
+        original_query = user_input
+        last_msgs = []
+        for msg in chat_history[-6:]:  # Adjust the slice as needed for context length
+            if isinstance(msg, HumanMessage):
+                last_msgs.append(f"User: {msg.content}")
+            elif isinstance(msg, AIMessage):
+                last_msgs.append(f"Assistant: {msg.content}")
+
+        formatted_history = "\n".join(last_msgs)
+        print("formatted_history ",formatted_history)
+        
+        try:
+            # Check if we should attempt context resolution
+            needs_context = False
+            
+            # Always attempt context resolution when:
+            # 1. We have chat history
+            # 2. AND either the query is very short OR contains pronouns/references
+            if chat_history:
+                # Short queries like "list 5" likely need context
+                word_count = len(user_input.split())
+                contains_pronoun = any(word in user_input.lower() for word in ['it', 'they', 'that', 'those', 'these', 'their', 'them','his', 'her', 'its'])
+                contains_reference = any(word in user_input.lower() for word in ['more', 'else', 'additional', 'another', 'next', 'previous', 'again', 'instead'])
+                contains_numeric_only = word_count <= 3 and any(term.isdigit() for term in user_input.split())  
+                incomplete_query = word_count <= 3
+                
+                if contains_pronoun or incomplete_query or contains_reference or contains_numeric_only:
+                    needs_context = True
+            
+            if needs_context:
+                try:                    
+                    context_check_prompt = f"""
+                    You are an assistant helping to rewrite user questions that depend on previous conversation context.
+
+                    Given the chat history and the latest user message, your task is to:
+                        -**Rewrite it to be a complete standalone question** that includes all necessary context.
+                        -If the latest user message is something like "show more", "give more", or "show all", and the previous message was a result list (e.g., top 5 customers),
+                            then infer the user wants a longer version (e.g., top 10 or top 20 customers). You may assume a reasonable step increase such as 10. 
+
+                    ---
+                    **Chat History:**
+                    {formatted_history}
+                    ---
+                    **Latest User Message:**
+                    {user_input}
+
+                    ---
+                    Now return ONLY the **rephrased standalone question**, without any extra text, explanation, or formatting.
+
+                    """
+                    
+                    rewritten_question = self.llm.invoke(context_check_prompt).content.strip()
+                    
+                    # Only use the rewritten question if it's different and not a yes/no response
+                    if (rewritten_question != user_input and 
+                        not rewritten_question.lower().startswith(("yes", "no"))):
+                        print(f"DEBUG - Original query: '{user_input}'")
+                        print(f"DEBUG - Rewritten with context: '{rewritten_question}'")
+                        user_input = rewritten_question
+                except Exception as e:
+                    logging.warning(f"Context replacement failed: {str(e)}. Continuing with original question.")
+            
+            # Use cached schema
+            return {
+                "query": user_input,
+                "table_schema": self.db.get_table_info(),
+                "original_query": original_query
+            }
+            
+            state["next_step"] = "generate_response"
+        except Exception as e:
+            logging.error(f"Error in resolve_conference: {str(e)}")
+
+        return {
+                "query": original_query,
+                "table_schema": self.db.get_table_info(),
+                "original_query": original_query
+            }
+
+    def get_chat_history(self):
+            """
+            Retrieve the entire chat history from the memory.
+            
+            Returns:
+                List of messages in the chat history (formatted for the UI).
+            """
+            # Retrieve chat history from memory (could be HumanMessage, AIMessage, etc.)
+            return self.memory.message_history
+    
+    def list_session_folders(self):
+        """
+        List all subfolder names one level above the current conversation store path.
+        
+        Returns:
+            List of subfolder names sorted by creation time, most recent first.
+        """
+        return self.memory.list_session_folders()
