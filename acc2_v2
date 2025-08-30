@@ -1,0 +1,276 @@
+import os
+import re
+import json
+import time
+import logging
+import httpx
+import pandas as pd
+from sqlalchemy import text
+from dotenv import load_dotenv
+
+# LangChain / LLM imports
+from langchain.prompts import PromptTemplate
+from langchain_community.utilities import SQLDatabase
+from langchain_experimental.sql import SQLDatabaseChain
+from langchain_openai import ChatOpenAI
+from langchain_core.messages import HumanMessage, AIMessage
+
+# Internal imports
+from app.memory.chat_memory import ChatMemory
+from app.vectorstore.vector_store import DocumentRetriever as VectorStore
+
+
+class SQLChatInsight:
+    """Main class to process natural language questions into SQL insights and summaries."""
+
+    def __init__(
+        self,
+        uniqueSessionId: str,
+        user_id: str = "",
+        username: str = "",
+        db_uri: str = None,
+        model_name: str = "gpt4o"
+    ):
+        self.db_uri = db_uri
+        self.model_name = model_name
+        self.uniqueSessionId = uniqueSessionId
+        self.user_id = user_id
+        self.user_name = username
+
+        # Initialize LLM with secure client
+        client = httpx.Client(verify=False, trust_env=False)
+        self.llm = ChatOpenAI(
+            api_key=os.getenv("API_KEY"),
+            base_url=os.getenv("END_URL"),
+            http_client=client,
+            model=self.model_name,
+            temperature=0.02,
+        )
+
+        # Memory handler
+        self.memory = ChatMemory(
+            uniqueSessionId=uniqueSessionId,
+            max_token_limit=2000,
+            llm=self.llm,
+            user_id=self.user_id,
+            username=self.user_name,
+        )
+
+        # Vectorstore for document retrieval
+        self.vectorstore = VectorStore(user_id=user_id, username=username)
+
+        # Database setup
+        self.db = SQLDatabase.from_uri(self.db_uri)
+        self.engine = self.db._engine
+
+        # SQL chain for query generation & validation
+        self.sql_chain = SQLDatabaseChain.from_llm(
+            llm=self.llm,
+            db=self.db,
+            verbose=True,
+            return_sql=True,
+            use_query_checker=True,
+        )
+
+        # Prompt for summarizing SQL results
+        self.summary_prompt = PromptTemplate.from_template(
+            """
+You are a helpful assistant summarizing SQL query results for the user.
+
+User Question:
+{question}
+
+SQL Query:
+{clean_sql}
+
+Query Results:
+{data}
+
+Respond strictly in this JSON format:
+
+{{
+  "summary": "Concise summary of results, highlighting key insights.",
+  "visualizationApplicable": true,
+  "appropriateVisualizations": ["bar", "line"],
+  "chartResponses": [
+    {{
+      "type": "bar",
+      "title": "Sales per Month",
+      "xAxis": "Month",
+      "yAxis": "Sales",
+      "data": [
+        {{ "Month": "Jan", "Sales": 10000 }},
+        {{ "Month": "Feb", "Sales": 15000 }}
+      ]
+    }}
+  ]
+}}
+
+Guidelines:
+- If visualization makes sense, set "visualizationApplicable" to true.
+- If not, set it to false with empty arrays for visualizations & charts.
+- Ensure valid JSON output.
+"""
+        )
+
+    # ---------------------------
+    # Public Methods
+    # ---------------------------
+
+    def process_question(self, question: str) -> dict:
+        """Main pipeline: question → SQL → results → summary → visualization."""
+        start_time = time.time()
+
+        # Get recent chat history
+        history_context = self._format_chat_history(self.memory.message_history[-10:])
+
+        # Resolve coreference issues in the question
+        resolved = self.resolve_conference(question, history_context)
+        question = resolved["query"]
+
+        # Step 1: Generate SQL from question
+        response = self.sql_chain.invoke(question)
+        raw_sql = response.get("result", "")
+        clean_sql = self._extract_sql(raw_sql)
+
+        # Step 2: Execute SQL and fetch results
+        with self.engine.connect() as conn:
+            result_df = pd.read_sql(text(clean_sql), conn)
+
+        # Step 3: Ask LLM for summary & visualization suggestion
+        llm_input = result_df.to_markdown(index=False)[:5000]
+        llm_response = self.llm.invoke(
+            self.summary_prompt.format(
+                data=llm_input,
+                question=question,
+                clean_sql=clean_sql,
+            )
+        )
+
+        insight_dict = self._safe_json_parse(getattr(llm_response, "content", llm_response))
+        result_json = result_df.to_dict(orient="records")
+
+        # Final structured response
+        final_response = {
+            "role": "assistant",
+            "content": insight_dict.get("summary", ""),
+            "summary": insight_dict.get("summary", ""),
+            "visualizationApplicable": insight_dict.get("visualizationApplicable", False),
+            "appropriateVisualizations": insight_dict.get("appropriateVisualizations", []),
+            "chartResponses": insight_dict.get("chartResponses", []),
+            "query": clean_sql,
+            "results": result_json,
+            "timeTaken": time.time() - start_time,
+        }
+
+        # Save interaction to memory
+        self.memory.add_user_ai_exchange({"role": "user", "content": question}, final_response)
+        return final_response
+
+    def resolve_conference(self, user_input: str, chat_history: list) -> dict:
+        """Rewrite user input to standalone query if it depends on context."""
+        original_query = user_input
+
+        # Build history string
+        last_msgs = [
+            f"User: {msg.content}" if isinstance(msg, HumanMessage) else f"Assistant: {msg.content}"
+            for msg in chat_history[-6:]
+        ]
+        formatted_history = "\n".join(last_msgs)
+
+        try:
+            needs_context = self._needs_context(user_input, chat_history)
+            if needs_context:
+                prompt = f"""
+Rewrite this user query into a complete standalone version using chat history.
+
+Chat History:
+{formatted_history}
+
+Latest User Message:
+{user_input}
+
+Return ONLY the rewritten standalone question, nothing else.
+"""
+                rewritten = self.llm.invoke(prompt).content.strip()
+                if rewritten and rewritten.lower() not in ["yes", "no"] and rewritten != user_input:
+                    user_input = rewritten
+
+            return {
+                "query": user_input,
+                "table_schema": self.db.get_table_info(),
+                "original_query": original_query,
+            }
+
+        except Exception as e:
+            logging.error(f"Error in resolve_conference: {e}")
+            return {
+                "query": original_query,
+                "table_schema": self.db.get_table_info(),
+                "original_query": original_query,
+            }
+
+    def get_chat_history(self):
+        """Return raw chat history from memory."""
+        return self.memory.message_history
+
+    def list_session_folders(self):
+        """List stored session folders (most recent first)."""
+        return self.memory.list_session_folders()
+
+    # ---------------------------
+    # Private Helpers
+    # ---------------------------
+
+    def _format_chat_history(self, history: list) -> list:
+        """Format chat history into HumanMessage/AIMessage list."""
+        context = []
+        for item in history:
+            if isinstance(item, dict) and "user" in item and "assistant" in item:
+                context.append(HumanMessage(content=item["user"]["content"]))
+                context.append(AIMessage(content=item["assistant"]["content"]))
+        return context
+
+    def _extract_sql(self, raw_sql: str) -> str:
+        """Extract and clean SQL string from LLM output."""
+        if not raw_sql:
+            raise ValueError("No SQL query found in response.")
+
+        match = re.search(r"```sql\s*(.*?)```", raw_sql, re.DOTALL | re.IGNORECASE) or \
+                re.search(r"```(.*?)```", raw_sql, re.DOTALL)
+
+        if match:
+            sql = match.group(1).strip()
+        else:
+            idx = raw_sql.upper().find("SELECT")
+            if idx == -1:
+                raise ValueError("Could not parse SQL from output.")
+            sql = raw_sql[idx:].strip()
+
+        sql = sql.replace("`", "")
+        sql = "SELECT " + sql.split("SELECT", 1)[-1].strip()
+        return sql
+
+    def _safe_json_parse(self, content: str) -> dict:
+        """Safely parse JSON string from LLM, fallback to defaults if invalid."""
+        try:
+            return json.loads(content)
+        except Exception as e:
+            logging.warning(f"Failed to parse LLM JSON: {e}")
+            return {
+                "summary": content,
+                "visualizationApplicable": False,
+                "appropriateVisualizations": [],
+                "chartResponses": [],
+            }
+
+    def _needs_context(self, query: str, history: list) -> bool:
+        """Check if query likely depends on previous context."""
+        if not history:
+            return False
+        words = query.lower().split()
+        short = len(words) <= 3
+        pronouns = {"it", "they", "that", "those", "these", "their", "them", "his", "her", "its"}
+        refs = {"more", "else", "additional", "another", "next", "previous", "again", "instead"}
+        numeric = short and any(w.isdigit() for w in words)
+        return short or any(w in words for w in pronouns | refs) or numeric
