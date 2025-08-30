@@ -1,11 +1,58 @@
- return ChatResponse(
-            role=response.get("role", "assistant"),
-            content=response.get("content", ""),
-            summary=response.get("summary", ""),
-            query=response.get("query", ""),
-            visualizationApplicable=response.get("visualizationApplicable", False),
-            appropriateVisualizations=response.get("appropriateVisualizations", []),
-            chartResponses=response.get("chartResponses", []),
-            results=response.get("results", []),
-            timeTaken=response.get("timeTaken", None)
-        )
+import pandas as pd
+import numpy as np
+
+def suggest_chart_for_columns(df: pd.DataFrame, col_x: str, col_y: str):
+    """
+    Suggest chart types and return chart-ready data
+    for the given two columns.
+    """
+    x_dtype = df[col_x].dtype
+    y_dtype = df[col_y].dtype
+
+    chart_types = []
+
+    # Case 1: Category + Numeric → Bar, Pie, Doughnut
+    if (x_dtype == 'object' or str(x_dtype) == 'category') and np.issubdtype(y_dtype, np.number):
+        chart_types = ["bar", "pie", "doughnut"]
+
+    # Case 2: Datetime + Numeric → Line, Bar
+    elif np.issubdtype(x_dtype, np.datetime64) and np.issubdtype(y_dtype, np.number):
+        chart_types = ["line", "bar"]
+
+    # Case 3: Numeric + Numeric → Bubble, Scatter
+    elif np.issubdtype(x_dtype, np.number) and np.issubdtype(y_dtype, np.number):
+        chart_types = ["bubble", "scatter"]
+
+    else:
+        chart_types = ["table"]  # fallback
+
+    # Prepare chart data
+    labels = df[col_x].astype(str).tolist()
+    values = df[col_y].tolist()
+
+    chart_data = {
+        "labels": labels,
+        "datasets": [{
+            "label": f"{col_y} vs {col_x}",
+            "data": values
+        }]
+    }
+
+    return {
+        "chart_types": chart_types,
+        "columns": (col_x, col_y),
+        "chart_data": chart_data
+    }
+
+# ---------------- Example ----------------
+data = {
+    "Region": ["East", "West", "North", "South"],
+    "Sales": [430, 320, 950, 670],
+    "Profit": [120, 150, 300, 220],
+    "Date": pd.date_range("2025-01-01", periods=4)
+}
+df = pd.DataFrame(data)
+
+# 👉 You provide the 2 columns here
+result = suggest_chart_for_columns(df, "Region", "Sales")
+print(result)
