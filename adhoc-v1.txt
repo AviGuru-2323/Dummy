@@ -1,26 +1,2 @@
-Hi Team,
-
-I wanted to share that I will be leaving [Current Company Name] and moving on to a new opportunity with [New Company Name]. My last working day here will be [Last Working Day].
-
-It has been an absolute pleasure working with all of you. I truly value the support, collaboration, and camaraderie we’ve shared during my time here. I’ve learned so much and will carry forward not just the professional experience, but also the wonderful memories we’ve created together.
-
-Thank you for making my journey here a rewarding and enjoyable one. I wish each of you continued success and hope our paths cross again in the future.
-
-You can always reach me at: [Personal Email] / [LinkedIn Profile].
-
-Wishing you all the very best,
-[Your Name]
-
-If you’d like, I can also make a shorter, lighter version that feels more casual for close teammates. Would you like me to prepare that too?
-
-
-
-
-
-
-
-
-
-Ask ChatGPT
-
-Unlock more with Plu
+@SuppressFBWarnings(value = "PATH_TRAVERSAL_IN",
+    justification = "sslKeyStorePath comes from trusted application configuration")
