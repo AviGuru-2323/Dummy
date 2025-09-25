@@ -1,0 +1,129 @@
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0
+                             http://maven.apache.org/xsd/maven-4.0.0.xsd">
+  <modelVersion>4.0.0</modelVersion>
+
+  <groupId>com.example</groupId>
+  <artifactId>spring-proxy</artifactId>
+  <version>1.0.0</version>
+  <packaging>jar</packaging>
+
+  <parent>
+    <groupId>org.springframework.boot</groupId>
+    <artifactId>spring-boot-starter-parent</artifactId>
+    <version>3.3.3</version>
+  </parent>
+
+  <dependencies>
+    <!-- Reactive Web stack for non-blocking streaming proxy -->
+    <dependency>
+      <groupId>org.springframework.boot</groupId>
+      <artifactId>spring-boot-starter-webflux</artifactId>
+    </dependency>
+
+    <!-- For YAML/Properties config if you like -->
+    <dependency>
+      <groupId>org.springframework.boot</groupId>
+      <artifactId>spring-boot-configuration-processor</artifactId>
+      <optional>true</optional>
+    </dependency>
+  </dependencies>
+
+  <build>
+    <plugins>
+      <plugin>
+        <groupId>org.springframework.boot</groupId>
+        <artifactId>spring-boot-maven-plugin</artifactId>
+      </plugin>
+    </plugins>
+  </build>
+</project>
+
+
+package com.example.proxy;
+
+import org.springframework.boot.SpringApplication;
+import org.springframework.boot.autoconfigure.SpringBootApplication;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.context.annotation.Bean;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.HttpMethod;
+import org.springframework.web.bind.annotation.*;
+import org.springframework.web.reactive.function.client.WebClient;
+import reactor.core.publisher.Mono;
+import jakarta.servlet.http.HttpServletRequest;
+import org.springframework.http.server.reactive.ServerHttpRequest;
+import org.springframework.web.server.ServerWebExchange;
+
+@SpringBootApplication
+@RestController
+public class ProxyApplication {
+
+    @Value("${proxy.targetBaseUrl}")
+    private String targetBaseUrl;
+
+    @Bean
+    WebClient webClient(WebClient.Builder builder) {
+        return builder.build();
+    }
+
+    private final WebClient client;
+
+    public ProxyApplication(WebClient client) {
+        this.client = client;
+    }
+
+    // Catch-all mapping: forward everything under /proxy/**
+    @RequestMapping("/**")
+public Mono<Void> proxy(ServerWebExchange exchange) {
+    ServerHttpRequest request = exchange.getRequest();
+
+    // Extract Host header
+    String host = request.getHeaders().getFirst("Host");  // e.g., api.example.com
+    String scheme = request.getURI().getScheme() != null ? request.getURI().getScheme() : "http";
+    String path = request.getURI().getRawPath();
+    String query = request.getURI().getRawQuery();
+
+    String targetUrl = scheme + "://" + host + path + (query != null ? "?" + query : "");
+
+    WebClient.RequestBodySpec spec = webClient.method(request.getMethod())
+        .uri(targetUrl)
+        .headers(h -> {
+            request.getHeaders().forEach((k, v) -> h.put(k, v));
+            h.add("X-Extra-Header", "added-by-proxy");
+        });
+
+    return spec.body(request.getBody(), byte[].class)
+               .exchangeToMono(resp ->
+                   exchange.getResponse().writeWith(resp.bodyToFlux(byte[].class))
+               );
+}
+
+
+    public static void main(String[] args) {
+        SpringApplication.run(ProxyApplication.class, args);
+    }
+}
+
+
+
+server.port=8085                 # Port for the proxy sidecar
+proxy.targetBaseUrl=http://localhost:9000   # Example real destination base URL
+spring.main.web-application-type=reactive
+
+
+
+mvn quarkus:dev \
+  -Dquarkus.http.proxy.enable=true \
+  -Dhttp.proxyHost=localhost \
+  -Dhttp.proxyPort=9000 \
+  -Dhttps.proxyHost=localhost \
+  -Dhttps.proxyPort=9000
+
+
+set JAVA_TOOL_OPTIONS="-Dhttp.proxyHost=localhost -Dhttp.proxyPort=9000 -Dhttps.proxyHost=localhost -Dhttps.proxyPort=9000"
+mvnw quarkus:dev
+
+
+
