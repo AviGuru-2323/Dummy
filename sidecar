@@ -1,221 +1,98 @@
-<project xmlns="http://maven.apache.org/POM/4.0.0"
-         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
-         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0
-                             http://maven.apache.org/xsd/maven-4.0.0.xsd">
-  <modelVersion>4.0.0</modelVersion>
-
-  <groupId>com.example</groupId>
-  <artifactId>spring-proxy</artifactId>
-  <version>1.0.0</version>
-  <packaging>jar</packaging>
-
-  <parent>
-    <groupId>org.springframework.boot</groupId>
-    <artifactId>spring-boot-starter-parent</artifactId>
-    <version>3.3.3</version>
-  </parent>
-
-  <dependencies>
-    <!-- Reactive Web stack for non-blocking streaming proxy -->
-    <dependency>
-      <groupId>org.springframework.boot</groupId>
-      <artifactId>spring-boot-starter-webflux</artifactId>
-    </dependency>
-
-    <!-- For YAML/Properties config if you like -->
-    <dependency>
-      <groupId>org.springframework.boot</groupId>
-      <artifactId>spring-boot-configuration-processor</artifactId>
-      <optional>true</optional>
-    </dependency>
-  </dependencies>
-
-  <build>
-    <plugins>
-      <plugin>
-        <groupId>org.springframework.boot</groupId>
-        <artifactId>spring-boot-maven-plugin</artifactId>
-      </plugin>
-    </plugins>
-  </build>
-</project>
-
-
-package com.example.proxy;
-
-import org.springframework.boot.SpringApplication;
-import org.springframework.boot.autoconfigure.SpringBootApplication;
-import org.springframework.beans.factory.annotation.Value;
-import org.springframework.context.annotation.Bean;
-import org.springframework.http.HttpHeaders;
-import org.springframework.http.HttpMethod;
-import org.springframework.web.bind.annotation.*;
-import org.springframework.web.reactive.function.client.WebClient;
-import reactor.core.publisher.Mono;
-import jakarta.servlet.http.HttpServletRequest;
-import org.springframework.http.server.reactive.ServerHttpRequest;
-import org.springframework.web.server.ServerWebExchange;
-
-@SpringBootApplication
-@RestController
-public class ProxyApplication {
-
-    @Value("${proxy.targetBaseUrl}")
-    private String targetBaseUrl;
-
-    @Bean
-    WebClient webClient(WebClient.Builder builder) {
-        return builder.build();
-    }
-
-    private final WebClient client;
-
-    public ProxyApplication(WebClient client) {
-        this.client = client;
-    }
-
-    // Catch-all mapping: forward everything under /proxy/**
-    @RequestMapping("/**")
-public Mono<Void> proxy(ServerWebExchange exchange) {
-    ServerHttpRequest request = exchange.getRequest();
-
-    // Extract Host header
-    String host = request.getHeaders().getFirst("Host");  // e.g., api.example.com
-    String scheme = request.getURI().getScheme() != null ? request.getURI().getScheme() : "http";
-    String path = request.getURI().getRawPath();
-    String query = request.getURI().getRawQuery();
-
-    String targetUrl = scheme + "://" + host + path + (query != null ? "?" + query : "");
-
-    WebClient.RequestBodySpec spec = webClient.method(request.getMethod())
-        .uri(targetUrl)
-        .headers(h -> {
-            request.getHeaders().forEach((k, v) -> h.put(k, v));
-            h.add("X-Extra-Header", "added-by-proxy");
-        });
-
-    return spec.body(request.getBody(), byte[].class)
-               .exchangeToMono(resp ->
-                   exchange.getResponse().writeWith(resp.bodyToFlux(byte[].class))
-               );
-}
-
-
-    public static void main(String[] args) {
-        SpringApplication.run(ProxyApplication.class, args);
-    }
-}
-
-
-
-server.port=8085                 # Port for the proxy sidecar
-proxy.targetBaseUrl=http://localhost:9000   # Example real destination base URL
-spring.main.web-application-type=reactive
-
-
-
-mvn quarkus:dev \
-  -Dquarkus.http.proxy.enable=true \
-  -Dhttp.proxyHost=localhost \
-  -Dhttp.proxyPort=9000 \
-  -Dhttps.proxyHost=localhost \
-  -Dhttps.proxyPort=9000
-
-
-set JAVA_TOOL_OPTIONS="-Dhttp.proxyHost=localhost -Dhttp.proxyPort=9000 -Dhttps.proxyHost=localhost -Dhttps.proxyPort=9000"
-mvnw quarkus:dev
-
-
-@RequestMapping("/**")
-public Mono<Void> proxy(ServerWebExchange exchange) {
-    ServerHttpRequest request = exchange.getRequest();
-
-    String host = request.getHeaders().getFirst("Host");
-    String scheme = request.getURI().getScheme() != null ? request.getURI().getScheme() : "http";
-    String path = request.getURI().getRawPath();
-    String query = request.getURI().getRawQuery();
-    String targetUrl = scheme + "://" + host + path + (query != null ? "?" + query : "");
-
-    return webClient.method(request.getMethod())
-            .uri(targetUrl)
-            .headers(h -> {
-                request.getHeaders().forEach((k, v) -> h.put(k, v));
-                h.add("X-Extra-Header", "added-by-proxy");
-            })
-            .body(request.getBody(), byte[].class)
-            .exchangeToMono(resp ->
-                // Copy status and headers first
-                {
-                    exchange.getResponse().setStatusCode(resp.statusCode());
-                    resp.headers().asHttpHeaders()
-                        .forEach((k, v) -> exchange.getResponse().getHeaders().put(k, v));
-                    // Stream the body directly back to the client
-                    return exchange.getResponse().writeWith(resp.bodyToFlux(byte[].class));
-                }
-            );
-}
-
-
-
-@RequestMapping("/**")
-public Mono<Void> proxy(ServerWebExchange exchange) {
-    ServerHttpRequest request = exchange.getRequest();
-
-    String host = request.getHeaders().getFirst("Host");
-    String scheme = request.getURI().getScheme() != null ? request.getURI().getScheme() : "http";
-    String path = request.getURI().getRawPath();
-    String query = request.getURI().getRawQuery();
-    String targetUrl = scheme + "://" + host + path + (query != null ? "?" + query : "");
-
-    return webClient
-            .method(request.getMethod())
-            .uri(targetUrl)
-            .headers(h -> {
-                request.getHeaders().forEach((k, v) -> h.put(k, v));
-                h.add("X-Extra-Header", "added-by-proxy");
-            })
-            .body(request.getBody(), byte[].class)
-            .exchangeToMono((ClientResponse resp) -> {   // <── explicit parameter type
-                // Copy status and headers
-                exchange.getResponse().setStatusCode(resp.statusCode());
-                resp.headers().asHttpHeaders()
-                        .forEach((k, v) -> exchange.getResponse().getHeaders().put(k, v));
-
-                // Explicitly declare the return variable as Mono<Void>
-                Mono<Void> result = exchange.getResponse()
-                                            .writeWith(resp.bodyToFlux(byte[].class));
-                return result;                           // <── compiler now sees Mono<Void>
-            });
-}
-
-
-
-import io.netty.handler.ssl.SslContextBuilder;
-import io.netty.handler.ssl.util.InsecureTrustManagerFactory;
+import org.apache.http.conn.ssl.NoopHostnameVerifier;
+import org.apache.http.conn.ssl.TrustAllStrategy;
+import org.apache.http.impl.client.CloseableHttpClient;
+import org.apache.http.impl.client.HttpClients;
+import org.apache.http.ssl.SSLContextBuilder;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
-import org.springframework.web.reactive.function.client.WebClient;
-import reactor.netty.http.client.HttpClient;
+import org.springframework.http.client.HttpComponentsClientHttpRequestFactory;
+import org.springframework.web.client.RestTemplate;
 
 @Configuration
-public class WebClientConfig {
+public class RestTemplateConfig {
 
     @Bean
-    public WebClient insecureWebClient() {
-        HttpClient httpClient = HttpClient.create()
-            .secure(sslSpec -> sslSpec.sslContext(
-                SslContextBuilder.forClient()
-                    .trustManager(InsecureTrustManagerFactory.INSTANCE)
-            ));
+    public RestTemplate insecureRestTemplate() throws Exception {
+        SSLContextBuilder sslContextBuilder = SSLContextBuilder.create()
+            .loadTrustMaterial(null, TrustAllStrategy.INSTANCE);
 
-        return WebClient.builder()
-            .clientConnector(new reactor.netty.http.client.HttpClientConnector(httpClient))
+        CloseableHttpClient httpClient = HttpClients.custom()
+            .setSSLContext(sslContextBuilder.build())
+            .setSSLHostnameVerifier(NoopHostnameVerifier.INSTANCE)
             .build();
+
+        return new RestTemplate(new HttpComponentsClientHttpRequestFactory(httpClient));
     }
 }
 
 
 
-    public ProxyController(WebClient insecureWebClient) {
-        this.webClient = insecureWebClient;
+import jakarta.servlet.http.HttpServletRequest;
+import jakarta.servlet.http.HttpServletResponse;
+import org.springframework.http.client.ClientHttpResponse;
+import org.springframework.stereotype.Controller;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.client.RestTemplate;
+
+import java.io.ByteArrayOutputStream;
+import java.io.InputStream;
+import java.io.OutputStream;
+import java.net.URI;
+import java.nio.charset.StandardCharsets;
+
+@Controller
+@RequestMapping("/proxy/**")
+public class ProxyController {
+
+    private final RestTemplate restTemplate;
+
+    public ProxyController(RestTemplate insecureRestTemplate) {
+        this.restTemplate = insecureRestTemplate;
     }
+
+    @RequestMapping("/**")
+    public void proxy(HttpServletRequest request, HttpServletResponse response) throws Exception {
+        String targetHost = request.getHeader("Host");
+        String path = request.getRequestURI().replaceFirst("/proxy", "");
+        String query = request.getQueryString();
+        String targetUrl = "https://" + targetHost + path + (query != null ? "?" + query : "");
+
+        byte[] responseBytes = restTemplate.execute(
+            new URI(targetUrl),
+            org.springframework.http.HttpMethod.valueOf(request.getMethod()),
+            clientHttpRequest -> {
+                request.getHeaderNames().asIterator()
+                        .forEachRemaining(name ->
+                                clientHttpRequest.getHeaders().add(name, request.getHeader(name))
+                        );
+            },
+            (ClientHttpResponse clientResponse) -> {
+                // Copy status
+                response.setStatus(clientResponse.getRawStatusCode());
+                clientResponse.getHeaders()
+                        .forEach((k, v) -> response.setHeader(k, String.join(",", v)));
+
+                // Read body into byte array
+                try (InputStream is = clientResponse.getBody();
+                     ByteArrayOutputStream baos = new ByteArrayOutputStream()) {
+                    is.transferTo(baos);
+                    byte[] bodyBytes = baos.toByteArray();
+
+                    // Print response as string (you can also log)
+                    String bodyString = new String(bodyBytes, StandardCharsets.UTF_8);
+                    System.out.println("Response from target:\n" + bodyString);
+
+                    return bodyBytes;
+                }
+            }
+        );
+
+        // Write the bytes back to the client
+        try (OutputStream os = response.getOutputStream()) {
+            os.write(responseBytes);
+        }
+    }
+}
+
+
+
