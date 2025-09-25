@@ -157,3 +157,33 @@ public Mono<Void> proxy(ServerWebExchange exchange) {
 
 
 
+@RequestMapping("/**")
+public Mono<Void> proxy(ServerWebExchange exchange) {
+    ServerHttpRequest request = exchange.getRequest();
+
+    String host = request.getHeaders().getFirst("Host");
+    String scheme = request.getURI().getScheme() != null ? request.getURI().getScheme() : "http";
+    String path = request.getURI().getRawPath();
+    String query = request.getURI().getRawQuery();
+    String targetUrl = scheme + "://" + host + path + (query != null ? "?" + query : "");
+
+    return webClient
+            .method(request.getMethod())
+            .uri(targetUrl)
+            .headers(h -> {
+                request.getHeaders().forEach((k, v) -> h.put(k, v));
+                h.add("X-Extra-Header", "added-by-proxy");
+            })
+            .body(request.getBody(), byte[].class)
+            .exchangeToMono((ClientResponse resp) -> {   // <── explicit parameter type
+                // Copy status and headers
+                exchange.getResponse().setStatusCode(resp.statusCode());
+                resp.headers().asHttpHeaders()
+                        .forEach((k, v) -> exchange.getResponse().getHeaders().put(k, v));
+
+                // Explicitly declare the return variable as Mono<Void>
+                Mono<Void> result = exchange.getResponse()
+                                            .writeWith(resp.bodyToFlux(byte[].class));
+                return result;                           // <── compiler now sees Mono<Void>
+            });
+}
