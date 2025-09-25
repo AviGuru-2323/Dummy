@@ -1,126 +1,219 @@
-import org.apache.http.conn.ssl.NoopHostnameVerifier;
-import org.apache.http.conn.ssl.TrustAllStrategy;
-import org.apache.http.impl.client.CloseableHttpClient;
-import org.apache.http.impl.client.HttpClients;
-import org.apache.http.ssl.SSLContextBuilder;
-import org.springframework.context.annotation.Bean;
-import org.springframework.context.annotation.Configuration;
-import org.springframework.http.client.HttpComponentsClientHttpRequestFactory;
-import org.springframework.web.client.RestTemplate;
+Absolutely! Here's a **complete Spring Boot WebFlux sidecar project** that:
 
-@Configuration
-public class RestTemplateConfig {
+* Uses **WebFlux + Netty** (non-blocking).
+* Intercepts all requests (`/**`) or can filter specific patterns.
+* Uses **WebClient** with **disabled SSL validation**.
+* Prints the response before sending it back.
+* Adds custom headers.
 
-    @Bean
-    public RestTemplate insecureRestTemplate() throws Exception {
-        SSLContextBuilder sslContextBuilder = SSLContextBuilder.create()
-            .loadTrustMaterial(null, TrustAllStrategy.INSTANCE);
+---
 
-        CloseableHttpClient httpClient = HttpClients.custom()
-            .setSSLContext(sslContextBuilder.build())
-            .setSSLHostnameVerifier(NoopHostnameVerifier.INSTANCE)
-            .build();
+## 1️⃣ `pom.xml`
 
-        return new RestTemplate(new HttpComponentsClientHttpRequestFactory(httpClient));
+```xml
+<project xmlns="http://maven.apache.org/POM/4.0.0" 
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 
+         http://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+
+    <groupId>com.example</groupId>
+    <artifactId>webflux-proxy-sidecar</artifactId>
+    <version>1.0.0</version>
+
+    <properties>
+        <java.version>17</java.version>
+        <spring.boot.version>3.3.5</spring.boot.version>
+        <reactor.netty.version>1.1.12</reactor.netty.version>
+    </properties>
+
+    <dependencies>
+        <!-- Spring Boot WebFlux -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-webflux</artifactId>
+        </dependency>
+
+        <!-- Netty (WebFlux uses Reactor Netty by default) -->
+        <dependency>
+            <groupId>io.projectreactor.netty</groupId>
+            <artifactId>reactor-netty-http</artifactId>
+            <version>${reactor.netty.version}</version>
+        </dependency>
+
+        <!-- Optional: Logging -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-logging</artifactId>
+        </dependency>
+    </dependencies>
+
+    <build>
+        <plugins>
+            <!-- Spring Boot Maven plugin -->
+            <plugin>
+                <groupId>org.springframework.boot</groupId>
+                <artifactId>spring-boot-maven-plugin</artifactId>
+                <version>${spring.boot.version}</version>
+            </plugin>
+        </plugins>
+    </build>
+</project>
+```
+
+---
+
+## 2️⃣ `ProxyApplication.java`
+
+```java
+package com.example.proxy;
+
+import org.springframework.boot.SpringApplication;
+import org.springframework.boot.autoconfigure.SpringBootApplication;
+
+@SpringBootApplication
+public class ProxyApplication {
+
+    public static void main(String[] args) {
+        SpringApplication.run(ProxyApplication.class, args);
     }
 }
+```
 
+---
 
+## 3️⃣ `WebClientConfig.java`
 
-import jakarta.servlet.http.HttpServletRequest;
-import jakarta.servlet.http.HttpServletResponse;
-import org.springframework.http.client.ClientHttpResponse;
-import org.springframework.stereotype.Controller;
+```java
+package com.example.proxy;
+
+import io.netty.handler.ssl.SslContextBuilder;
+import io.netty.handler.ssl.util.InsecureTrustManagerFactory;
+import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Configuration;
+import org.springframework.web.reactive.function.client.WebClient;
+import reactor.netty.http.client.HttpClient;
+import org.springframework.http.client.reactive.ReactorClientHttpConnector;
+
+@Configuration
+public class WebClientConfig {
+
+    @Bean
+    public WebClient webClient() {
+        HttpClient httpClient = HttpClient.create()
+            .secure(spec -> spec.sslContext(
+                SslContextBuilder.forClient()
+                    .trustManager(InsecureTrustManagerFactory.INSTANCE)
+            ));
+
+        return WebClient.builder()
+                .clientConnector(new ReactorClientHttpConnector(httpClient))
+                .build();
+    }
+}
+```
+
+---
+
+## 4️⃣ `ProxyController.java`
+
+```java
+package com.example.proxy;
+
+import org.springframework.core.io.buffer.DataBufferFactory;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.HttpMethod;
+import org.springframework.http.server.reactive.ServerHttpRequest;
+import org.springframework.http.server.reactive.ServerHttpResponse;
 import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.client.RestTemplate;
+import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.reactive.function.client.ClientResponse;
+import org.springframework.web.reactive.function.client.WebClient;
+import org.springframework.web.server.ServerWebExchange;
+import reactor.core.publisher.Mono;
 
-import java.io.ByteArrayOutputStream;
-import java.io.InputStream;
-import java.io.OutputStream;
-import java.net.URI;
-import java.nio.charset.StandardCharsets;
-
-@Controller
-@RequestMapping("/proxy/**")
+@RestController
 public class ProxyController {
 
-    private final RestTemplate restTemplate;
+    private final WebClient webClient;
 
-    public ProxyController(RestTemplate insecureRestTemplate) {
-        this.restTemplate = insecureRestTemplate;
+    public ProxyController(WebClient webClient) {
+        this.webClient = webClient;
     }
 
     @RequestMapping("/**")
-    public void proxy(HttpServletRequest request, HttpServletResponse response) throws Exception {
-        String targetHost = request.getHeader("Host");
-        String path = request.getRequestURI().replaceFirst("/proxy", "");
-        String query = request.getQueryString();
-        String targetUrl = "https://" + targetHost + path + (query != null ? "?" + query : "");
+    public Mono<Void> proxy(ServerWebExchange exchange) {
+        ServerHttpRequest request = exchange.getRequest();
+        ServerHttpResponse response = exchange.getResponse();
+        DataBufferFactory bufferFactory = response.bufferFactory();
 
-        byte[] responseBytes = restTemplate.execute(
-            new URI(targetUrl),
-            org.springframework.http.HttpMethod.valueOf(request.getMethod()),
-            clientHttpRequest -> {
-                request.getHeaderNames().asIterator()
-                        .forEachRemaining(name ->
-                                clientHttpRequest.getHeaders().add(name, request.getHeader(name))
-                        );
-            },
-            (ClientHttpResponse clientResponse) -> {
-                // Copy status
-                response.setStatus(clientResponse.getRawStatusCode());
-                clientResponse.getHeaders()
-                        .forEach((k, v) -> response.setHeader(k, String.join(",", v)));
+        // Construct target URL
+        String targetHost = request.getHeaders().getFirst(HttpHeaders.HOST);
+        String scheme = request.getURI().getScheme() != null ? request.getURI().getScheme() : "http";
+        String path = request.getURI().getRawPath();
+        String query = request.getURI().getRawQuery();
+        String targetUrl = scheme + "://" + targetHost + path + (query != null ? "?" + query : "");
 
-                // Read body into byte array
-                try (InputStream is = clientResponse.getBody();
-                     ByteArrayOutputStream baos = new ByteArrayOutputStream()) {
-                    is.transferTo(baos);
-                    byte[] bodyBytes = baos.toByteArray();
+        return webClient.method(HttpMethod.valueOf(request.getMethodValue()))
+                .uri(targetUrl)
+                .headers(headers -> {
+                    request.getHeaders().forEach(headers::put);
+                    headers.add("X-Extra-Header", "added-by-proxy");
+                })
+                .body(request.getBody(), byte[].class)
+                .exchangeToMono((ClientResponse clientResponse) -> {
+                    response.setStatusCode(clientResponse.statusCode());
+                    clientResponse.headers().asHttpHeaders()
+                            .forEach((k, v) -> response.getHeaders().put(k, v));
 
-                    // Print response as string (you can also log)
-                    String bodyString = new String(bodyBytes, StandardCharsets.UTF_8);
-                    System.out.println("Response from target:\n" + bodyString);
-
-                    return bodyBytes;
-                }
-            }
-        );
-
-        // Write the bytes back to the client
-        try (OutputStream os = response.getOutputStream()) {
-            os.write(responseBytes);
-        }
+                    // Print response before sending
+                    return clientResponse.bodyToMono(String.class)
+                            .flatMap(body -> {
+                                System.out.println("Response body:\n" + body);
+                                return response.writeWith(
+                                        Mono.just(bufferFactory.wrap(body.getBytes()))
+                                );
+                            });
+                });
     }
 }
+```
 
+---
 
-<dependencies>
-    <!-- Spring Boot Web (Servlet stack, Tomcat) -->
-    <dependency>
-        <groupId>org.springframework.boot</groupId>
-        <artifactId>spring-boot-starter-web</artifactId>
-    </dependency>
+## 5️⃣ `application.properties`
 
-    <!-- Apache HttpClient for RestTemplate SSL customization -->
-    <dependency>
-        <groupId>org.apache.httpcomponents.client5</groupId>
-        <artifactId>httpclient5</artifactId>
-        <version>5.2.1</version>
-    </dependency>
+```properties
+server.port=8085
+spring.main.web-application-type=reactive
+```
 
-    <dependency>
-        <groupId>org.apache.httpcomponents.core5</groupId>
-        <artifactId>httpcore5</artifactId>
-        <version>5.2.1</version>
-    </dependency>
+---
 
-    <!-- Optional: logging -->
-    <dependency>
-        <groupId>org.springframework.boot</groupId>
-        <artifactId>spring-boot-starter-logging</artifactId>
-    </dependency>
+### ✅ How it works
 
-</dependencies>
+* The **WebFlux Netty server** listens on port `8085`.
+* All requests (`/**`) are intercepted by `ProxyController`.
+* The proxy forwards the request to the **original host**.
+* Adds `X-Extra-Header`.
+* Prints the response body in console before sending it back.
+* SSL validation is **disabled** for outgoing HTTPS requests.
 
+---
 
+### 6️⃣ Running the sidecar locally
+
+```bash
+mvn spring-boot:run
+```
+
+Your **Quarkus apps** can be configured to use the proxy via:
+
+* `-Dhttp.proxyHost=localhost -Dhttp.proxyPort=8085`
+* Or call the proxy URL directly (`http://localhost:8085/...`).
+
+---
+
+If you want, I can provide a **version that only proxies certain URL patterns** instead of all requests (`/**`), and also **streams large responses without loading into memory**. This is more efficient for production sidecars.
+
+Do you want me to provide that optimized streaming version?
