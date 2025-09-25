@@ -126,4 +126,34 @@ set JAVA_TOOL_OPTIONS="-Dhttp.proxyHost=localhost -Dhttp.proxyPort=9000 -Dhttps.
 mvnw quarkus:dev
 
 
+@RequestMapping("/**")
+public Mono<Void> proxy(ServerWebExchange exchange) {
+    ServerHttpRequest request = exchange.getRequest();
+
+    String host = request.getHeaders().getFirst("Host");
+    String scheme = request.getURI().getScheme() != null ? request.getURI().getScheme() : "http";
+    String path = request.getURI().getRawPath();
+    String query = request.getURI().getRawQuery();
+    String targetUrl = scheme + "://" + host + path + (query != null ? "?" + query : "");
+
+    return webClient.method(request.getMethod())
+            .uri(targetUrl)
+            .headers(h -> {
+                request.getHeaders().forEach((k, v) -> h.put(k, v));
+                h.add("X-Extra-Header", "added-by-proxy");
+            })
+            .body(request.getBody(), byte[].class)
+            .exchangeToMono(resp ->
+                // Copy status and headers first
+                {
+                    exchange.getResponse().setStatusCode(resp.statusCode());
+                    resp.headers().asHttpHeaders()
+                        .forEach((k, v) -> exchange.getResponse().getHeaders().put(k, v));
+                    // Stream the body directly back to the client
+                    return exchange.getResponse().writeWith(resp.bodyToFlux(byte[].class));
+                }
+            );
+}
+
+
 
