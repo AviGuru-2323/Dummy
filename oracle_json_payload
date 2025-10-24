@@ -1,0 +1,22 @@
+CREATE TABLE DOC_MASTER (
+  DOC_ID VARCHAR2(64) PRIMARY KEY,
+  DOC_TYPE VARCHAR2(64),
+  DOC_CLASS VARCHAR2(64),
+  DOC_METADATA CLOB CHECK (DOC_METADATA IS JSON),
+  CREATED_AT DATE DEFAULT SYSDATE,
+  POLICY_NO VARCHAR2(50)
+    GENERATED ALWAYS AS (JSON_VALUE(DOC_METADATA, '$.policyNo')) VIRTUAL,
+  REGION VARCHAR2(50)
+    GENERATED ALWAYS AS (JSON_VALUE(DOC_METADATA, '$.region')) VIRTUAL
+);
+
+CREATE INDEX IDX_DOC_CLASS ON DOC_MASTER (DOC_CLASS);
+CREATE INDEX IDX_POLICY_NO ON DOC_MASTER (POLICY_NO);
+CREATE INDEX IDX_REGION ON DOC_MASTER (REGION);
+CREATE SEARCH INDEX DOC_META_SEARCH_IDX ON DOC_MASTER (DOC_METADATA) FOR JSON;
+
+
+⚠️ Slightly slower for targeted equality/range queries compared to a normal B-tree index
+⚠️ Search index consumes more storage (~20–30% of data volume)
+⚠️ Hard to do composite queries (like policyNo + region) with efficient plans unless using JSON_EXISTS filters carefully
+⚠️ Slight DML overhead for maintaining JSON search index (especially on 10M+ inserts)
