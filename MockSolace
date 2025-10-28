@@ -1,0 +1,214 @@
+src/
+ └── main/
+     ├── java/
+     │   └── com/example/mocksolace/
+     │        ├── MockSolaceApplication.java
+     │        ├── config/MockSolaceConfig.java
+     │        ├── broker/MockSolaceBroker.java
+     │        ├── listener/MockSolaceListener.java
+     │        ├── publisher/MockSolacePublisherService.java
+     │        └── controller/MockSolaceController.java
+     └── resources/
+         └── application.properties
+
+spring.application.name=mock-solace
+solace.jms.queue=hk-solace-queue
+server.port=8080
+
+
+package com.example.mocksolace;
+
+import org.springframework.boot.SpringApplication;
+import org.springframework.boot.autoconfigure.SpringBootApplication;
+
+@SpringBootApplication
+public class MockSolaceApplication {
+    public static void main(String[] args) {
+        SpringApplication.run(MockSolaceApplication.class, args);
+    }
+}
+
+
+package com.example.mocksolace.config;
+
+import com.example.mocksolace.broker.MockSolaceBroker;
+import jakarta.jms.ConnectionFactory;
+import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Configuration;
+import org.springframework.jms.annotation.EnableJms;
+import org.springframework.jms.config.DefaultJmsListenerContainerFactory;
+
+@Configuration
+@EnableJms
+public class MockSolaceConfig {
+
+    @Bean
+    public ConnectionFactory connectionFactory(MockSolaceBroker broker) {
+        // Our custom in-memory Solace-like broker acts as a ConnectionFactory
+        return broker;
+    }
+
+    @Bean
+    public DefaultJmsListenerContainerFactory contFactory(ConnectionFactory connectionFactory) {
+        DefaultJmsListenerContainerFactory factory = new DefaultJmsListenerContainerFactory();
+        factory.setConnectionFactory(connectionFactory);
+        factory.setConcurrency("2");
+        factory.setSessionTransacted(false);
+        return factory;
+    }
+}
+
+
+package com.example.mocksolace.broker;
+
+import jakarta.annotation.PostConstruct;
+import jakarta.annotation.PreDestroy;
+import jakarta.jms.*;
+import org.springframework.stereotype.Component;
+import java.util.concurrent.BlockingQueue;
+import java.util.concurrent.LinkedBlockingQueue;
+
+/**
+ * A lightweight, in-memory mock of Solace JMS broker.
+ * Acts as both ConnectionFactory and Message queue.
+ */
+@Component
+public class MockSolaceBroker implements ConnectionFactory, Connection, Session, Queue, MessageProducer {
+
+    private final BlockingQueue<TextMessage> queue = new LinkedBlockingQueue<>();
+    private boolean running = true;
+
+    @PostConstruct
+    public void init() {
+        System.out.println("🟢 Mock Solace Broker started — simulating queue: hk-solace-queue");
+        new Thread(this::simulateDelivery, "mock-solace-delivery-thread").start();
+    }
+
+    private void simulateDelivery() {
+        while (running) {
+            try {
+                TextMessage msg = queue.take();
+                System.out.println("📨 [Broker] Message delivered internally: " + msg.getText());
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+            }
+        }
+    }
+
+    // --- Simplified JMS interfaces ---
+    @Override public Connection createConnection() { return this; }
+    @Override public Session createSession(boolean transacted, int acknowledgeMode) { return this; }
+    @Override public MessageProducer createProducer(Destination destination) { return this; }
+    @Override public Queue createQueue(String queueName) { return this; }
+    @Override public void send(Message message) {
+        if (message instanceof TextMessage tm) queue.offer(tm);
+    }
+
+    public void sendText(String payload) throws JMSException {
+        TextMessage msg = new MockTextMessage(payload);
+        send(msg);
+    }
+
+    @Override public void start() {}
+    @Override public void close() {}
+
+    @PreDestroy
+    public void shutdown() {
+        running = false;
+        System.out.println("🛑 Mock Solace Broker stopped.");
+    }
+
+    // --- Internal TextMessage Implementation ---
+    private static class MockTextMessage implements TextMessage {
+        private String text;
+        public MockTextMessage(String text) { this.text = text; }
+        @Override public void setText(String s) { this.text = s; }
+        @Override public String getText() { return text; }
+        // No-ops for unused JMS methods
+    }
+}
+
+
+package com.example.mocksolace.listener;
+
+import jakarta.jms.JMSException;
+import jakarta.jms.Message;
+import jakarta.jms.TextMessage;
+import org.springframework.jms.annotation.JmsListener;
+import org.springframework.stereotype.Component;
+
+@Component
+public class MockSolaceListener {
+
+    @JmsListener(destination = "${solace.jms.queue}", containerFactory = "contFactory", concurrency = "2")
+    public void processMsg(Message message) throws JMSException {
+        if (message instanceof TextMessage text) {
+            System.out.println("💬 Listener received: " + text.getText());
+        } else {
+            System.out.println("💬 Received non-text message: " + message);
+        }
+    }
+}
+
+
+package com.example.mocksolace.publisher;
+
+import com.example.mocksolace.broker.MockSolaceBroker;
+import jakarta.annotation.PostConstruct;
+import jakarta.annotation.PreDestroy;
+import jakarta.jms.JMSException;
+import org.springframework.stereotype.Service;
+
+@Service
+public class MockSolacePublisherService {
+
+    private final MockSolaceBroker broker;
+
+    public MockSolacePublisherService(MockSolaceBroker broker) {
+        this.broker = broker;
+    }
+
+    @PostConstruct
+    public void warmup() throws JMSException {
+        System.out.println("🚀 Starting mock publisher...");
+        for (int i = 1; i <= 3; i++) {
+            broker.sendText("Warm-up message " + i);
+        }
+    }
+
+    public void send(String msg) throws JMSException {
+        broker.sendText(msg);
+        System.out.println("📤 Published: " + msg);
+    }
+
+    @PreDestroy
+    public void shutdown() {
+        System.out.println("🛑 Mock publisher shutting down...");
+    }
+}
+
+
+package com.example.mocksolace.controller;
+
+import com.example.mocksolace.publisher.MockSolacePublisherService;
+import jakarta.jms.JMSException;
+import org.springframework.web.bind.annotation.*;
+
+@RestController
+@RequestMapping("/mock-solace")
+public class MockSolaceController {
+
+    private final MockSolacePublisherService publisherService;
+
+    public MockSolaceController(MockSolacePublisherService publisherService) {
+        this.publisherService = publisherService;
+    }
+
+    @PostMapping("/send")
+    public String sendMessage(@RequestParam String msg) throws JMSException {
+        publisherService.send(msg);
+        return "✅ Mock message sent: " + msg;
+    }
+}
+
+
