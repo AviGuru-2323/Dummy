@@ -212,3 +212,282 @@ public class MockSolaceController {
 }
 
 
+
+
+
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0
+                             http://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+
+    <groupId>com.example</groupId>
+    <artifactId>mock-solace</artifactId>
+    <version>1.0.0</version>
+    <packaging>jar</packaging>
+
+    <name>Mock Solace Local JMS</name>
+    <description>Self-contained Spring Boot mock for Solace JMS queues</description>
+
+    <!-- ✅ Spring Boot parent -->
+    <parent>
+        <groupId>org.springframework.boot</groupId>
+        <artifactId>spring-boot-starter-parent</artifactId>
+        <version>3.3.5</version>
+        <relativePath/>
+    </parent>
+
+    <properties>
+        <java.version>17</java.version>
+    </properties>
+
+    <dependencies>
+        <!-- ✅ Core Spring Boot -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter</artifactId>
+        </dependency>
+
+        <!-- ✅ JMS / Messaging Support -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-activemq</artifactId>
+        </dependency>
+
+        <!-- ✅ Jakarta JMS API (for Message, TextMessage, etc.) -->
+        <dependency>
+            <groupId>jakarta.jms</groupId>
+            <artifactId>jakarta.jms-api</artifactId>
+            <version>3.1.0</version>
+        </dependency>
+
+        <!-- ✅ Optional testing -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-test</artifactId>
+            <scope>test</scope>
+        </dependency>
+    </dependencies>
+
+    <build>
+        <plugins>
+            <!-- ✅ Spring Boot plugin -->
+            <plugin>
+                <groupId>org.springframework.boot</groupId>
+                <artifactId>spring-boot-maven-plugin</artifactId>
+            </plugin>
+
+            <!-- ✅ Compiler settings -->
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-compiler-plugin</artifactId>
+                <version>3.11.0</version>
+                <configuration>
+                    <source>${java.version}</source>
+                    <target>${java.version}</target>
+                </configuration>
+            </plugin>
+        </plugins>
+    </build>
+</project>
+
+
+
+
+
+
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+  <modelVersion>4.0.0</modelVersion>
+
+  <groupId>com.example</groupId>
+  <artifactId>mock-solace-broker</artifactId>
+  <version>1.0.0</version>
+  <name>Mock Solace Broker (Embedded ActiveMQ)</name>
+  <description>Embedded ActiveMQ broker that listens on tcp://localhost:55555</description>
+
+  <parent>
+    <groupId>org.springframework.boot</groupId>
+    <artifactId>spring-boot-starter-parent</artifactId>
+    <version>3.3.5</version>
+    <relativePath/>
+  </parent>
+
+  <properties>
+    <java.version>17</java.version>
+    <activemq.version>5.18.3</activemq.version>
+  </properties>
+
+  <dependencies>
+    <!-- Spring Boot core -->
+    <dependency>
+      <groupId>org.springframework.boot</groupId>
+      <artifactId>spring-boot-starter</artifactId>
+    </dependency>
+
+    <!-- (Optional) health endpoint at /actuator/health -->
+    <dependency>
+      <groupId>org.springframework.boot</groupId>
+      <artifactId>spring-boot-starter-actuator</artifactId>
+    </dependency>
+
+    <!-- ActiveMQ broker runtime -->
+    <dependency>
+      <groupId>org.apache.activemq</groupId>
+      <artifactId>activemq-broker</artifactId>
+      <version>${activemq.version}</version>
+    </dependency>
+
+    <!-- ActiveMQ client (helps if you later add a tiny test sender inside this app) -->
+    <dependency>
+      <groupId>org.apache.activemq</groupId>
+      <artifactId>activemq-client</artifactId>
+      <version>${activemq.version}</version>
+    </dependency>
+
+    <!-- JMS API (Jakarta) -->
+    <dependency>
+      <groupId>jakarta.jms</groupId>
+      <artifactId>jakarta.jms-api</artifactId>
+      <version>3.1.0</version>
+      <scope>provided</scope>
+    </dependency>
+
+    <!-- Tests -->
+    <dependency>
+      <groupId>org.springframework.boot</groupId>
+      <artifactId>spring-boot-starter-test</artifactId>
+      <scope>test</scope>
+    </dependency>
+  </dependencies>
+
+  <build>
+    <plugins>
+      <plugin>
+        <groupId>org.springframework.boot</groupId>
+        <artifactId>spring-boot-maven-plugin</artifactId>
+      </plugin>
+      <plugin>
+        <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-compiler-plugin</artifactId>
+        <version>3.11.0</version>
+        <configuration>
+          <source>${java.version}</source>
+          <target>${java.version}</target>
+        </configuration>
+      </plugin>
+    </plugins>
+  </build>
+</project>
+
+
+spring.application.name=mock-solace-broker
+
+# ---- Broker bind host/port (0.0.0.0 to accept remote too; keep 127.0.0.1 if local-only) ----
+mock.broker.bindHost=0.0.0.0
+mock.broker.port=55555
+
+# ---- Optional auth (set to true to require credentials) ----
+mock.broker.auth.enabled=false
+mock.broker.auth.user=admin
+mock.broker.auth.password=admin
+
+# ---- Memory only, no persistence (good for local/dev) ----
+mock.broker.persistent=false
+
+# Actuator health (optional)
+management.endpoints.web.exposure.include=health,info
+
+
+
+package com.example.mocksolacebroker;
+
+import org.springframework.boot.SpringApplication;
+import org.springframework.boot.autoconfigure.SpringBootApplication;
+
+@SpringBootApplication
+public class MockSolaceBrokerApplication {
+  public static void main(String[] args) {
+    SpringApplication.run(MockSolaceBrokerApplication.class, args);
+  }
+}
+
+
+
+package com.example.mocksolacebroker.config;
+
+import org.apache.activemq.broker.BrokerService;
+import org.apache.activemq.broker.region.policy.PolicyEntry;
+import org.apache.activemq.broker.region.policy.PolicyMap;
+import org.apache.activemq.security.SimpleAuthenticationPlugin;
+import org.apache.activemq.transport.TransportConnector;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Configuration;
+
+import java.net.URI;
+import java.util.List;
+
+@Configuration
+public class EmbeddedBrokerConfig {
+
+  @Value("${mock.broker.bindHost:0.0.0.0}")
+  private String bindHost;
+
+  @Value("${mock.broker.port:55555}")
+  private int port;
+
+  @Value("${mock.broker.persistent:false}")
+  private boolean persistent;
+
+  @Value("${mock.broker.auth.enabled:false}")
+  private boolean authEnabled;
+
+  @Value("${mock.broker.auth.user:admin}")
+  private String user;
+
+  @Value("${mock.broker.auth.password:admin}")
+  private String password;
+
+  @Bean(initMethod = "start", destroyMethod = "stop")
+  public BrokerService embeddedActiveMqBroker() throws Exception {
+    BrokerService broker = new BrokerService();
+    broker.setBrokerName("mock-solace-embedded-broker");
+    broker.setPersistent(persistent);
+    broker.setUseJmx(false); // keep lightweight
+
+    // Listen on tcp://<bindHost>:<port>
+    TransportConnector connector = new TransportConnector();
+    connector.setName("tcp");
+    connector.setUri(new URI("tcp://" + bindHost + ":" + port));
+    broker.addConnector(connector);
+
+    // Optional simple auth
+    if (authEnabled) {
+      SimpleAuthenticationPlugin sap = new SimpleAuthenticationPlugin();
+      sap.setUsers(List.of(
+          new org.apache.activemq.security.AuthenticationUser(user, password, "users,admins")
+      ));
+      broker.setPlugins(new org.apache.activemq.broker.BrokerPlugin[]{sap});
+    }
+
+    // Optional: simple destination policy (auto-creates queues on first use)
+    PolicyEntry entry = new PolicyEntry();
+    entry.setQueue(">"); // applies to all queues
+    PolicyMap map = new PolicyMap();
+    map.setPolicyEntries(List.of(entry));
+    broker.setDestinationPolicy(map);
+
+    // Log the endpoint
+    System.out.println("✅ Embedded ActiveMQ started at tcp://" + bindHost + ":" + port +
+        (authEnabled ? " (auth enabled)" : " (no auth)"));
+
+    return broker;
+  }
+}
+
+
+
