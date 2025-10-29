@@ -491,3 +491,360 @@ public class EmbeddedBrokerConfig {
 
 
 
+
+
+
+
+
+
+
+
+package com.example.mocksolace.broker;
+
+import jakarta.annotation.PostConstruct;
+import jakarta.annotation.PreDestroy;
+import jakarta.jms.*;
+import org.springframework.stereotype.Component;
+
+import java.io.Serializable;
+import java.util.Enumeration;
+import java.util.Map;
+import java.util.concurrent.BlockingQueue;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.LinkedBlockingQueue;
+
+/**
+ * A lightweight, in-memory mock of a Solace JMS broker that supports multiple named queues.
+ * It acts as a minimal ConnectionFactory so Spring Boot JMS can use it.
+ */
+@Component
+public class MockSolaceBroker implements ConnectionFactory {
+
+    private final Map<String, BlockingQueue<TextMessage>> queues = new ConcurrentHashMap<>();
+    private boolean running = true;
+
+    // ------------------------------------------------------------------------
+    // Broker startup / shutdown
+    // ------------------------------------------------------------------------
+
+    @PostConstruct
+    public void start() {
+        System.out.println("🟢 Mock Solace Broker started — supporting multiple queues");
+        new Thread(this::simulateDeliveryLoop, "mock-solace-delivery-thread").start();
+    }
+
+    @PreDestroy
+    public void stop() {
+        running = false;
+        System.out.println("🛑 Mock Solace Broker stopped.");
+    }
+
+    private void simulateDeliveryLoop() {
+        try {
+            while (running) {
+                for (Map.Entry<String, BlockingQueue<TextMessage>> entry : queues.entrySet()) {
+                    TextMessage msg = entry.getValue().poll();
+                    if (msg != null) {
+                        System.out.println("📨 [Broker] Delivered from " + entry.getKey() + ": " + msg.getText());
+                    }
+                }
+                Thread.sleep(200);
+            }
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+    }
+
+    // ------------------------------------------------------------------------
+    // JMS ConnectionFactory
+    // ------------------------------------------------------------------------
+
+    @Override
+    public Connection createConnection() {
+        return new MockConnection();
+    }
+
+    @Override
+    public Connection createConnection(String userName, String password) {
+        return new MockConnection();
+    }
+
+    // ------------------------------------------------------------------------
+    // Inner mock JMS classes
+    // ------------------------------------------------------------------------
+
+    private class MockConnection implements Connection {
+        @Override
+        public Session createSession(boolean transacted, int acknowledgeMode) {
+            return new MockSession();
+        }
+
+        @Override public void start() {}
+        @Override public void stop() {}
+        @Override public void close() {}
+        @Override public String getClientID() { return "mock-client"; }
+        @Override public void setClientID(String id) {}
+        @Override public ConnectionMetaData getMetaData() { return null; }
+        @Override public ExceptionListener getExceptionListener() { return null; }
+        @Override public void setExceptionListener(ExceptionListener listener) {}
+        @Override public ConnectionConsumer createConnectionConsumer(Destination destination, String selector, ServerSessionPool pool, int maxMessages) { return null; }
+        @Override public ConnectionConsumer createDurableConnectionConsumer(Topic topic, String subName, String selector, ServerSessionPool pool, int maxMessages) { return null; }
+    }
+
+    private class MockSession implements Session {
+        @Override
+        public Queue createQueue(String queueName) {
+            queues.computeIfAbsent(queueName, name -> new LinkedBlockingQueue<>());
+            System.out.println("📦 [Broker] Queue created/registered: " + queueName);
+            return new MockQueue(queueName);
+        }
+
+        @Override
+        public MessageProducer createProducer(Destination destination) {
+            if (destination instanceof MockQueue mockQueue) {
+                return new MockMessageProducer(mockQueue.queueName());
+            }
+            return new MockMessageProducer("default");
+        }
+
+        @Override
+        public TextMessage createTextMessage(String text) {
+            return new MockTextMessage(text);
+        }
+
+        // --- Unused JMS methods (no-ops) ---
+        @Override public BytesMessage createBytesMessage() { return null; }
+        @Override public MapMessage createMapMessage() { return null; }
+        @Override public Message createMessage() { return null; }
+        @Override public ObjectMessage createObjectMessage() { return null; }
+        @Override public ObjectMessage createObjectMessage(Serializable object) { return null; }
+        @Override public StreamMessage createStreamMessage() { return null; }
+        @Override public TextMessage createTextMessage() { return new MockTextMessage(""); }
+        @Override public boolean getTransacted() { return false; }
+        @Override public int getAcknowledgeMode() { return Session.AUTO_ACKNOWLEDGE; }
+        @Override public void commit() {}
+        @Override public void rollback() {}
+        @Override public void close() {}
+        @Override public void recover() {}
+        @Override public MessageListener getMessageListener() { return null; }
+        @Override public void setMessageListener(MessageListener listener) {}
+        @Override public void run() {}
+        @Override public MessageConsumer createConsumer(Destination destination) { return null; }
+        @Override public MessageConsumer createConsumer(Destination destination, String selector) { return null; }
+        @Override public MessageConsumer createConsumer(Destination destination, String selector, boolean noLocal) { return null; }
+        @Override public Topic createTopic(String topicName) { return null; }
+        @Override public TopicSubscriber createDurableSubscriber(Topic topic, String name) { return null; }
+        @Override public TopicSubscriber createDurableSubscriber(Topic topic, String name, String selector, boolean noLocal) { return null; }
+        @Override public QueueBrowser createBrowser(Queue queue) { return null; }
+        @Override public QueueBrowser createBrowser(Queue queue, String selector) { return null; }
+        @Override public TemporaryQueue createTemporaryQueue() { return null; }
+        @Override public TemporaryTopic createTemporaryTopic() { return null; }
+        @Override public void unsubscribe(String name) {}
+        @Override public void unsubscribe(String name, boolean force) {}
+    }
+
+    private record MockQueue(String queueName) implements Queue {
+        @Override public String getQueueName() { return queueName; }
+    }
+
+    private class MockMessageProducer implements MessageProducer {
+        private final String queueName;
+
+        MockMessageProducer(String queueName) { this.queueName = queueName; }
+
+        @Override
+        public void send(Message message) {
+            BlockingQueue<TextMessage> q = queues.computeIfAbsent(queueName, k -> new LinkedBlockingQueue<>());
+            if (message instanceof TextMessage tm) {
+                q.offer(tm);
+                System.out.println("📤 [Producer] Sent to " + queueName + ": " + tm.getText());
+            }
+        }
+
+        // no-op overloads
+        @Override public void close() {}
+        @Override public void send(Destination destination, Message message) { send(message); }
+        @Override public void send(Message message, int deliveryMode, int priority, long timeToLive) { send(message); }
+        @Override public void send(Destination destination, Message message, int deliveryMode, int priority, long timeToLive) { send(message); }
+        @Override public void setDisableMessageID(boolean value) {}
+        @Override public boolean getDisableMessageID() { return false; }
+        @Override public void setDisableMessageTimestamp(boolean value) {}
+        @Override public boolean getDisableMessageTimestamp() { return false; }
+        @Override public void setDeliveryMode(int deliveryMode) {}
+        @Override public int getDeliveryMode() { return DeliveryMode.NON_PERSISTENT; }
+        @Override public void setPriority(int defaultPriority) {}
+        @Override public int getPriority() { return 4; }
+        @Override public void setTimeToLive(long timeToLive) {}
+        @Override public long getTimeToLive() { return 0; }
+        @Override public Destination getDestination() { return new MockQueue(queueName); }
+    }
+
+    private static class MockTextMessage implements TextMessage {
+        private String text;
+        public MockTextMessage(String text) { this.text = text; }
+        @Override public void setText(String s) { this.text = s; }
+        @Override public String getText() { return text; }
+        @Override public void clearBody() {}
+        @Override public <T> T getBody(Class<T> c) { return null; }
+
+        // --- minimal header/property stubs ---
+        @Override public void acknowledge() {}
+        @Override public void clearProperties() {}
+        @Override public boolean propertyExists(String name) { return false; }
+        @Override public boolean getBooleanProperty(String name) { return false; }
+        @Override public byte getByteProperty(String name) { return 0; }
+        @Override public short getShortProperty(String name) { return 0; }
+        @Override public int getIntProperty(String name) { return 0; }
+        @Override public long getLongProperty(String name) { return 0; }
+        @Override public float getFloatProperty(String name) { return 0; }
+        @Override public double getDoubleProperty(String name) { return 0; }
+        @Override public String getStringProperty(String name) { return null; }
+        @Override public Object getObjectProperty(String name) { return null; }
+        @Override public Enumeration<String> getPropertyNames() { return null; }
+        @Override public void setBooleanProperty(String name, boolean value) {}
+        @Override public void setByteProperty(String name, byte value) {}
+        @Override public void setShortProperty(String name, short value) {}
+        @Override public void setIntProperty(String name, int value) {}
+        @Override public void setLongProperty(String name, long value) {}
+        @Override public void setFloatProperty(String name, float value) {}
+        @Override public void setDoubleProperty(String name, double value) {}
+        @Override public void setStringProperty(String name, String value) {}
+        @Override public void setObjectProperty(String name, Object value) {}
+        @Override public void setJMSDeliveryMode(int deliveryMode) {}
+        @Override public int getJMSDeliveryMode() { return DeliveryMode.NON_PERSISTENT; }
+        @Override public void setJMSExpiration(long expiration) {}
+        @Override public long getJMSExpiration() { return 0; }
+        @Override public void setJMSPriority(int priority) {}
+        @Override public int getJMSPriority() { return 4; }
+        @Override public void setJMSMessageID(String id) {}
+        @Override public String getJMSMessageID() { return "mock-id"; }
+        @Override public void setJMSTimestamp(long timestamp) {}
+        @Override public long getJMSTimestamp() { return 0; }
+        @Override public void setJMSCorrelationID(String correlationID) {}
+        @Override public String getJMSCorrelationID() { return null; }
+        @Override public void setJMSReplyTo(Destination replyTo) {}
+        @Override public Destination getJMSReplyTo() { return null; }
+        @Override public void setJMSDestination(Destination destination) {}
+        @Override public Destination getJMSDestination() { return null; }
+        @Override public void setJMSDeliveryTime(long deliveryTime) {}
+        @Override public long getJMSDeliveryTime() { return 0; }
+        @Override public void setJMSType(String type) {}
+        @Override public String getJMSType() { return "TextMessage"; }
+        @Override public void setJMSRedelivered(boolean redelivered) {}
+        @Override public boolean getJMSRedelivered() { return false; }
+    }
+}
+
+
+package com.example.mocksolace.controller;
+
+import com.example.mocksolace.publisher.MockSolacePublisherService;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import jakarta.jms.JMSException;
+import org.springframework.web.bind.annotation.*;
+
+import java.util.Map;
+
+@RestController
+@RequestMapping("/mock-solace")
+public class MockSolaceController {
+
+    private final MockSolacePublisherService publisherService;
+    private final ObjectMapper objectMapper;
+
+    public MockSolaceController(MockSolacePublisherService publisherService, ObjectMapper objectMapper) {
+        this.publisherService = publisherService;
+        this.objectMapper = objectMapper;
+    }
+
+    /**
+     * Accepts any JSON payload and publishes it to the given queue.
+     *
+     * Example:
+     * POST /mock-solace/send?queueName=orders
+     * Body:
+     * {
+     *   "orderId": 123,
+     *   "customer": { "name": "Avinash", "city": "Chennai" },
+     *   "items": ["apple", "banana"]
+     * }
+     */
+    @PostMapping(value = "/send", consumes = "application/json", produces = "application/json")
+    public Map<String, Object> sendJsonMessage(
+            @RequestParam String queueName,
+            @RequestBody Map<String, Object> payload) throws JMSException {
+
+        // Convert the incoming JSON map to string
+        String jsonString;
+        try {
+            jsonString = objectMapper.writeValueAsString(payload);
+        } catch (Exception e) {
+            throw new RuntimeException("Failed to convert JSON", e);
+        }
+
+        publisherService.send(queueName, jsonString);
+
+        return Map.of(
+                "status", "✅ Message sent",
+                "queue", queueName,
+                "payload", payload
+        );
+    }
+}
+
+
+
+package com.example.mocksolace.publisher;
+
+import com.example.mocksolace.broker.MockSolaceBroker;
+import jakarta.annotation.PostConstruct;
+import jakarta.annotation.PreDestroy;
+import jakarta.jms.*;
+import org.springframework.stereotype.Service;
+
+@Service
+public class MockSolacePublisherService {
+
+    private final MockSolaceBroker broker;
+
+    public MockSolacePublisherService(MockSolaceBroker broker) {
+        this.broker = broker;
+    }
+
+    @PostConstruct
+    public void warmup() throws JMSException {
+        System.out.println("🚀 Starting mock publisher...");
+        send("hk-solace-queue", "{\"warmup\":\"message 1\"}");
+        send("hk-solace-queue", "{\"warmup\":\"message 2\"}");
+    }
+
+    /**
+     * Send message as JSON string to specific queue.
+     */
+    public void send(String queueName, String jsonPayload) throws JMSException {
+        Connection conn = broker.createConnection();
+        Session session = conn.createSession(false, Session.AUTO_ACKNOWLEDGE);
+        Queue queue = session.createQueue(queueName);
+        MessageProducer producer = session.createProducer(queue);
+
+        TextMessage textMessage = session.createTextMessage(jsonPayload);
+        producer.send(textMessage);
+
+        producer.close();
+        session.close();
+        conn.close();
+
+        System.out.println("📤 Published JSON to [" + queueName + "]: " + jsonPayload);
+    }
+
+    @PreDestroy
+    public void shutdown() {
+        System.out.println("🛑 Mock publisher shutting down...");
+    }
+}
+
+
+
+
+
+
