@@ -1,0 +1,465 @@
+
+sunday between two dates :
+
+WITH CTE(date_list) AS (
+      SELECT @StartDate
+      UNION ALL
+      SELECT DATEADD(day,1,date_list) FROM CTE
+      WHERE date_list<=@EndDate
+)
+SELECT date_list as 'List of sundays'
+FROM CTE
+WHERE DATENAME(weekday ,date_list) IN ('Sunday');
+/*In the where clause at last we are checking 
+each day from the list whether it is in Sunday list or not*/
+
+-- 
+BNP 
+
+
+select  dense_rank() over(partition by dept order by sal desc ) from dept ; 
+ do u need to add group by ?
+
+
+how to avoid context switches in select func() from dual ;-- pragma UDF
+
+
+B. Indexing Mechanisms
+Indexes speed up queries by avoiding full table scans.
+
+Common Types of Indexes:
+B+ Tree Index → Default for most relational databases.
+Hash Index → Optimized for exact match lookups.
+Full-Text Index → Used for searching text.
+Bitmap Index → Useful for low-cardinality columns (gender: M/F).
+
+
+5. Background Processes in SQL Engines
+Modern SQL databases include background tasks that improve efficiency:
+
+Checkpointing: Periodically writes modified pages from memory to disk.
+Log Writer: Maintains transaction logs for recovery.
+Garbage Collection (PostgreSQL VACUUM): Cleans up old row versions in MVCC.
+Query Cache: Stores frequently used query results.
+
+
+What is Collation?
+
+Answer: Set of rules that define how data is stored, how case sensitivity and Kana character can be treated etc.
+
+
+
+FOR UPDATE ?
+to lock specific rows using select condition 
+
+Merge into ? 
+
+Merge into target_table 
+using (select name , id , salary from emp) source_table
+on (s.id=t.id)
+when matched the 
+Update set t.id=s.id
+when not matched 
+insert into values 
+
+INSERT ALL ?
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+################################# Need to Check
+
+Composite data type   
+
+REF Constarints
+Cascade constraints -- on delete 
+seq inc by -4 
+
+Nested Sub query 
+Inline View -- sub query apears in from clause 
+Scalar sub query -- sub query apears in select  clause -- one column one row 
+With clause
+corelated sub query 
+
+
+View 
+insert, update , delete can
+how to prevent with check option 
+update view having more than one table - instead of triggers
+
+Database locks - 2 types
+Sharted locks
+Exclusive lock 
+
+SGA -- are of mem allocated when orac instance starts up 
+Library cache, data dic cache , DB buffer cache , redo log buffer 
+
+PGA -- non shareg GA by orac DB when a server process is artarted 
+- each process one PGA
+
+
+Tablespace -- logical storage unit more data files 
+data block -- smallest unit of data used by DB ( segment --> extent --> dat blocks )
+
+
+Data dictionary -- meta data 
+space allocated , constraints , audit information , default values 
+
+Data Fragementation -- 
+Data Modellinmg  -- conceptual to logical to physical 
+
+Deadlock -- two or more sessions waiting for data locked by each other 
+
+Virtual columns -- values derived at run time 
+
+Index 
+function based 
+Bitmap index (gender ) 
+
+rebuild index - why ? - several deletes & insert 
+
+when index suppressed?
+
+local index (1 to 1) - gloabl index ( 1 to many )  -- aplies for partition 
+
+queries : 
+
+select  amount , row_number () over ( partition by  amount )  from orders  ;
+
+
+
+analyse a query ?
+Explain for select .. 
+select * from table(DBMS_XPLAN.DISPALY)
+
+
+
+
+
+Nth salary :
+
+select amount from  (select  amount , dense_rank () over ( order by  amount desc ) n_salary from orders )where 
+n_salary =&N;
+
+last N records from a table:
+
+select * from emp
+minus
+select * from emp where rownum <=
+ (select count(*) - &n from emp);
+ 
+ 
+ Write a query to find the maximum salary from the EMP table without using functions. 
+Answer: 
+We can achieve this by using the SELF joins. 
+select * from emp  
+where sal not in 
+( 
+select A.sal 
+from emp A, emp B 
+where A.sal < B.sal 
+) 
+
+
+
+ Pragma autonomous 
+ P4 : 
+ Invoker rights / designer rights 
+ nocopy Hint - out & in out (pass by reference) 
+ Pass by value --> temp buffer 
+ 
+ Determinic function - repeated action to avoid buffer time
+ 
+ Overloading
+
+Dynamic SQL - Exec immediate (native dymaic sql) , DBMS_SQL 
+
+DBMS_SQL.open_cursor, parse, bind_variable, execute 
+
+DBMSL_SQL.to_refcursor 
+to_cursor_number
+
+
+Implicit cursor -- no data found , too many rows 
+
+%rowcount
+%found%notfound 
+%isopen
+
+
+Explicit 
+
+Unlimited dat to client application ? -- REF cursor 
+
+memory address of a query work area on the DB  / pointer to the query result set on database 
+
+no update -- read only 
+
+FOR UPDATE CLAUSE 
+
+
+collection -- group of elements having same datatype/ elements  , variable_name(index) 
+BULK Collect , FOR ALL , Table functions
+
+types :2
+assosiative array/ index by table  / pl/sql table - key value pairs(store multiple rows) 
+Nested  table -- unboubded , can delete data , index can be created ,one dimensional data 
+varray -- fixed number of elements , boubded , cant delete data , index cant be created 
+
+RECORD : %ROWTYPE
+composite data type / fielsds
+variable_name.field_name 
+
+Type typ_rec is RECORD ( empno number , emp_name varchar2)
+my_rec  typ_rec 
+
+Type typ_tab is TABLE of typ_rec 
+my_tab type_table 
+
+%type
+%rowtype 
+
+
+variable methods of collections : 
+delete 
+treim 
+extend 
+exists 
+first 
+last 
+count 
+limit 
+prior 
+next 
+
+Exceptions:
+NAmed system -- invalid cursor , no data found , invalid cursor , division by zero 
+unamaed sysatem/ pragma exception init  -- deadlock detected 
+user defined- RAISE (exception propagation )
+
+RAISE application error 
+
+SQLCODE 
+SQLERRM
+
+
+while doing insert / update onse statement failed how to find this ? 
+Instrumentation -- check this ? 
+
+
+Trigger 
+- table, vie , db , schema 
+
+Rowlevel , statement level , before , after 
+
+seq of execution of triggers :
+Bf st level
+bf row level 
+af row level 
+constraint 
+aft st level
+
+trigger - no comit 
+
+can commit by declaring pragma autonomous function 
+instead of triggers 
+Mutuating trigger / exception 
+Cascading triggers
+compound tiggers
+
+Bulk collect : 
+reduce numb of context switches btwn pl/sql engine and sql engine
+
+FOR ALL while inserting 1000 record error occur ?
+SAVE EXCEPTIONS in forall clause 
+SQL%BULK_Exceptions 
+
+
+
+
+PIVOT : 
+sales_month p_Id  amount 
+
+select * from 
+(
+select sales_mnth , p_id , amoun from sales ) 
+pivot (sum(amt) for (p_id)  in (100','200','300'))
+
+LISTAGG:
+
+select region 
+LISTaGG(lastname , ',') Within group (order by lastname)  as lname from tablename 
+group by region 
+
+LAG & LEAD 
+LAg(sal , 1,0) over(ord by sal) from emp
+
+
+
+
+
+
+
+
+
+
+
+ 
+ ################################# Sample Program
+SYS REF Cursor Example : 
+
+create or replace procedure get_emp_det
+(P_emp_no IN Emp.emp_no%type,
+ P_record_set OUT SYS_REFCURSOR)
+ 
+ begin 
+ open  P_record_set for 
+ select emp_name , emp_id , sal from 
+ emp where emp_no =P_emp_no ;
+ 
+  end ;
+  
+  Trigger :
+  
+  create or replace trigger trig_1 
+  after update on cust 
+  for each row
+  when old.region='SOUTH'
+  declare 
+  v_username varchar2(100);
+  begin
+  slect user into v_username from dual ;
+  insert into audit_log 
+  values (v_username, :old.region ,:new.region ,:old.district 
+  
+  end ;
+  
+  Dynamic SQL : 
+  
+ create  or replace procedure dyn_proc (emp_id IN number)
+ as 
+ begin
+ sqlstmt :='Delete from emp where emp_id = 'emp_id'';
+ 
+ Execute immediate  sqlstmt ; 
+ end ; 
+ 
+ 
+ bulk collect : 
+ 
+ create or replace procedure tax_update (tax_val In Number ) 
+ as
+ Type B_Sales as table of Sales.ored_id%type index by pls_integer ;
+ L_sales_id B_sales ;
+ cursor C1 is select 
+  order_id  from sales ;
+ begin 
+ open c1;
+ loop 
+ fecth c1 bulk collect into l_sales_id
+ limit 100;
+  
+ For all i in 1..L_sales_id.Count SAVE EXCEPTIONS
+      update sales set tax_val=
+	     where order_id=L_sales_id(i);
+	end loop ;
+	
+commit ;
+Exceptions 
+if SQLCODE='-24831' then 
+  For i in 1..SQL%BULK_EXCEPTIONS.count 
+   loop 
+  dBs_OUTput.put_line (SQL%BULK_EXCEPTIONS(i).ERROR_CODE || SQL%BULK_EXCEPTIONS(i).ERROR_INDEX ) 
+   end loop ; 
+end ;    
+
+
+PIVOT: 
+
+ate	FoodName	AmountEaten
+2019-08-01	Sammich	2
+2019-08-01	Pickle	3
+2019-08-01	Apple	1
+2019-08-02	Sammich	1
+2019-08-02	Pickle	1
+2019-08-02	Apple	4
+
+
+
+
+
+select date , 'ABc','XXX' from (
+select date , name , amount eaten from food ) as source_table
+PIVOT  (select sum(amount eaten) for name in  ['ABc','XXX']) 
+
+ 
+ Database link : 
+ 
+ create Database LINK Link_name
+ connect to remote_tabase identified  by remote_db_paaword
+ using connection_string 
+ 
+ 
+ insert all 
+ for update 
+ 
+ 
+ 19c features : 
+ 
+ Automatic indexing: Uses machine learning to automatically create, rebuild, and drop indexes based on workload patterns. This reduces manual tuning effort while improving query performance
+ 
+Real-time statistics: Extends online statistics gathering to conventional data manipulation language (DML) operations, ensuring the optimizer has up-to-date information for accurate execution plans.
+ 
+ security : 
+ Gradual password rollover: Allows database passwords to be changed with a temporary "grace period" during which both the old and new passwords are valid. This prevents application downtime during password rotation.
+ 
+ Automated PDB relocation: In a Real Application Clusters (RAC) environment, PDBs can be automatically relocated to different nodes, improving flexibility and resource management.
+ 
+ 
+Multitenant and cloud
+
+Three free PDBs: In Oracle 19c, customers can create up to three pluggable databases (PDBs) per container database (CDB) without purchasing the multitenant license option.
+
+DBMS_CLOUD package: Provides a PL/SQL interface to interact with cloud object storage directly from the database. 
+
+
+ 
+ Automatic Memory Management (AMM)
+ MEMORY_TARGET
+ <4GB
+ 
+ 
+ Automatic Shared Memory Management (ASMM):
+ SGA_TARGET
+ PGA_AGGREGATE_TARGET
+ >4GB
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+  
+
+ 
