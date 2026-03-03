@@ -1,0 +1,21 @@
+Atlassian Jira Cloud (Free account )
+        │
+        │  (Webhook: Issue Created / Comment Added)
+        ▼
+Your Local Agent Service  (FastAPI)
+        │
+        │ MCP Client (connects via OAuth) we fetch the jiira details based on the event we recieve
+        ▼
+Atlassian Remote MCP Server
+        │
+        ▼
+Jira Cloud APIs
+        │
+        ▼
+Local LLM (Ollama Llama 3 8B)
+        │
+        ▼
+Atlassian Remote MCP Server
+        │
+        ▼
+Jira Cloud APIs
