@@ -1,0 +1,44 @@
+Hi Team,
+
+Please find a brief overview of the proposed technical architecture for the Jira AI automation flow:
+
+1. Jira events (issue creation/comments) trigger a webhook that is exposed via a secure HTTP endpoint using API Gateway.
+
+2. The webhook request is received by a lightweight Lambda function (Webhook Receiver), which quickly processes the payload, extracts key details, and pushes the event to an SQS queue, returning an immediate response to avoid timeouts.
+
+3. SQS acts as a buffering and decoupling layer, ensuring reliable message handling, supporting traffic spikes, and enabling retry mechanisms through Dead Letter Queues (DLQ).
+
+4. A second Lambda function (Worker) is triggered asynchronously from SQS to handle the core processing logic.
+
+5. The worker function fetches Jira issue details via OAuth (MCP client), invokes the Claude API to generate technical specifications, SQL queries, and test cases.
+
+6. Finally, the generated outputs are optionally stored in S3 and uploaded back to Jira as attachments, along with automated comments.
+
+This architecture ensures scalability, fault tolerance, and efficient handling of asynchronous AI-driven processing.
+
+CICD below is the flow:
+
+Developer Push (GitHub)
+        │
+        ▼
+GitHub Actions (CI/CD Pipeline)
+        │
+        ├── Install dependencies
+        ├── Run tests
+        ├── Package FastAPI (with Mangum)
+        ├── Deploy to AWS Lambda
+        │
+        ▼
+AWS Lambda (Webhook Receiver + Worker)
+        │
+        ▼
+API Gateway (Public endpoint for Jira)
+        │
+        ▼
+SQS (optional buffer)
+        │
+        ▼
+Lambda Worker (processing logic)
+
+Regards,
+[Your Name]
